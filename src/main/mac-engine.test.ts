@@ -49,6 +49,39 @@ describe('appleGptkRoot', () => {
 });
 
 describe('prepareMacRunner', () => {
+  it('selects the separate FEX app and asks for an ARM64 bottle, independently of regular Preview', async () => {
+    const stable = await crossOverWithGptk(await tmp()), preview = await crossOverWithGptk(await tmp());
+    const arm = { ...await crossOverWithGptk(await tmp()), supportsArm64: true };
+    const options = deps(stable, undefined, []);
+    options.findCrossOverPreview = async () => preview;
+    options.findCrossOverPreviewFex = async () => arm;
+    let selection: unknown[] = [];
+    options.prepareCrossOver = async (cx, bottles, _dlls, _log, architecture) => {
+      selection = [cx, bottles, architecture];
+      return { command: '/fixture', compatibilityDataPath: '/fixture-prefix' };
+    };
+    const result = await prepareMacRunner({ setting: 'crossover-preview-fex', storeId: undefined, dataRoot: '/d', runtimeDllDir: '/dll', log: () => {} }, options);
+    expect(result.engine).toBe('crossover-preview-fex');
+    expect(selection).toEqual([arm, '/d/bottles-crossover-preview-fex', 'arm64']);
+  });
+  it('uses Preview only when selected, with an isolated bottle root and the Preview executables', async () => {
+    const stable = await crossOverWithGptk(await tmp()), preview = await crossOverWithGptk(await tmp());
+    const calls: string[] = [], options = deps(stable, undefined, calls);
+    options.findCrossOverPreview = async () => preview;
+    let selected: CrossOverInstall | undefined;
+    const original = options.prepareCrossOver;
+    options.prepareCrossOver = async (cx, ...args) => { selected = cx; return original(cx, ...args); };
+    const request = { setting: 'crossover-preview' as const, storeId: undefined, dataRoot: '/d', runtimeDllDir: '/dll', log: () => {} };
+    expect((await prepareMacRunner(request, options)).engine).toBe('crossover-preview');
+    expect(selected).toBe(preview); expect(calls[0]).toBe('crossover /d/bottles-crossover-preview');
+    calls.length = 0;
+    await prepareMacRunner({ ...request, setting: 'crossover' }, options);
+    expect(selected).toBe(stable); expect(calls[0]).toBe('crossover /d/bottles');
+  });
+  it('does not silently substitute regular CrossOver for missing Preview', async () => {
+    const cx = await crossOverWithGptk(await tmp());
+    await expect(prepareMacRunner({ setting: 'crossover-preview', storeId: undefined, dataRoot: '/d', runtimeDllDir: '/dll', log: () => {} }, deps(cx, undefined, []))).rejects.toThrow('CrossOver Preview was not found');
+  });
   it('uses CrossOver by default and logs the choice', async () => {
     const calls: string[] = []; const log: string[] = [];
     const cx = await crossOverWithGptk(await tmp());

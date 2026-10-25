@@ -6,6 +6,22 @@ import { MacEngineCard } from './MacEngineCard';
 const base = { highballInstalled: false, highballTag: 'engine-tag', installing: false };
 
 describe('MacEngineCard', () => {
+  it('offers detected Preview and shows its selected state, disabling it when absent', () => {
+    const present = renderToStaticMarkup(<MacEngineCard engine="crossover-preview" status={{ ...base, crossoverPreviewInstalled: true, crossoverPreviewVersion: '27.0' }} />);
+    expect(present).toContain('checked="" value="crossover-preview"');
+    expect(present).toContain('CrossOver Preview detected (27.0)');
+    expect(present).toContain('Refresh engine detection');
+    const absent = renderToStaticMarkup(<MacEngineCard status={{ ...base, crossoverPreviewInstalled: false }} />);
+    expect(absent).toMatch(/value="crossover-preview"/);
+    expect(absent).toContain('CrossOver Preview was not detected');
+    expect(absent).toMatch(/<input[^>]*disabled=""[^>]*value="crossover-preview"/);
+  });
+  it('offers FEX/ARM separately from Rosetta only when the ARM64 payload was detected', () => {
+    const html = renderToStaticMarkup(<MacEngineCard engine="crossover-preview-fex" status={{ ...base, crossoverPreviewInstalled: true, crossoverPreviewVersion: '20261015', crossoverPreviewFexSupported: true, crossoverPreviewFexVersion: '20261015' }} />);
+    expect(html).toContain('CrossOver Preview (Rosetta)'); expect(html).toContain('CrossOver Preview (FEX/ARM)');
+    expect(html).toContain('checked="" value="crossover-preview-fex"');
+    expect(html).toContain('Uses its own ARM64 bottle');
+  });
   it('offers CrossOver (default) and experimental Highball with an install action', () => {
     const html = renderToStaticMarkup(<MacEngineCard status={base} />);
     expect(html).toContain('Wine engine');

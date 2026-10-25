@@ -1,5 +1,14 @@
 // English source strings are the message keys. Keep placeholders identical in both languages.
 export const italianMessages = {
+  "Preview selection overrides automatic engine recommendations. Per-game environment fixes still apply.": "La scelta di Preview ha precedenza sui consigli automatici del motore. Le correzioni delle variabili per gioco restano attive.",
+  "CrossOver FEX/ARM Preview was not found. Install the ARM64 edition or choose another Wine engine.": "CrossOver Preview FEX/ARM non è stato trovato. Installa l’edizione ARM64 o scegli un altro motore Wine.",
+  "FEX/ARM Preview detected ({value0}). Uses its own ARM64 bottle. Game compatibility may differ from Rosetta.": "Rilevato Preview FEX/ARM ({value0}). Usa una propria bottle ARM64. La compatibilità dei giochi può differire da Rosetta.",
+  "This CrossOver Preview installation does not include the FEX/ARM engine.": "Questa installazione di CrossOver Preview non include il motore FEX/ARM.",
+  "CrossOver Preview was not found. Install it in Applications or choose another Wine engine.": "CrossOver Preview non è stato trovato. Installalo in Applicazioni o scegli un altro motore Wine.",
+  "CrossOver Preview detected ({value0}). Uses a separate bottle from regular CrossOver.": "Rilevato CrossOver Preview ({value0}). Usa una bottle separata da CrossOver normale.",
+  "CrossOver Preview was not detected in Applications. Install it, then refresh engine detection.": "CrossOver Preview non è stato rilevato in Applicazioni. Installalo, poi aggiorna il rilevamento dei motori.",
+  "Refresh engine detection": "Aggiorna rilevamento motori",
+  "Unknown version": "Versione sconosciuta",
   "Secret achievement": "Obiettivo segreto",
   "Reveal the details only if you want to see spoilers.": "Rivela i dettagli solo se vuoi vedere gli spoiler.",
   "Unlocked": "Sbloccato",

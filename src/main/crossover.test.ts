@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as processes from './process.js';
-import { MAC_RUNTIME_DLLS, bundledRuntimeDllDirectory, crossOverWrapperScript, findCrossOver, installRuntimeDlls, prepareCrossOverRunner, runtimeOverrideDirectory, stripBuiltinMarker, type CrossOverInstall } from './crossover.js';
+import { MAC_RUNTIME_DLLS, bundledRuntimeDllDirectory, crossOverCandidateRoots, crossOverWrapperScript, findCrossOver, findCrossOverPreview, findCrossOverPreviewFex, installRuntimeDlls, prepareCrossOverRunner, runtimeOverrideDirectory, stripBuiltinMarker, type CrossOverInstall } from './crossover.js';
 
 const temporary: string[] = [];
 async function tmp(): Promise<string> {
@@ -60,6 +60,36 @@ describe('crossOverWrapperScript', () => {
 });
 
 describe('findCrossOver', () => {
+  it('searches standard and Preview installations independently in system and user Applications', () => {
+    expect(crossOverCandidateRoots('standard', '/home/test')).toEqual(['/Applications/CrossOver.app/Contents/SharedSupport/CrossOver', '/home/test/Applications/CrossOver.app/Contents/SharedSupport/CrossOver']);
+    expect(crossOverCandidateRoots('preview', '/home/test')).toEqual(['/Applications/CrossOver Preview.app/Contents/SharedSupport/CrossOver', '/home/test/Applications/CrossOver Preview.app/Contents/SharedSupport/CrossOver']);
+  });
+  it('detects Preview executables without running Wine or creating a bottle', async () => {
+    const base = await tmp(), log = path.join(base, 'log');
+    const cx = await fakeInstall(base, log);
+    const reader = vi.spyOn(processes, 'run').mockResolvedValue({ code: 0, output: '27.0-preview\n' });
+    try {
+      expect(await findCrossOverPreview([cx.root])).toEqual({ ...cx, version: '27.0-preview' });
+      expect(reader).toHaveBeenCalledTimes(1);
+      await expect(readFile(log)).rejects.toThrow();
+    } finally { reader.mockRestore(); }
+  });
+  it('recognizes split Preview servers and verifies FEX payloads rather than trusting the app name', async () => {
+    const base = await tmp(), cx = await fakeInstall(base, path.join(base, 'log'));
+    const reader = vi.spyOn(processes, 'run').mockResolvedValue({ code: 0, output: '20261015\n' });
+    try {
+      expect(await findCrossOverPreviewFex([cx.root])).toBeUndefined();
+      await rm(cx.wineserver);
+      for (const name of ['wineserver-x86', 'wineserver-arm64']) await writeFile(path.join(cx.root, 'bin', name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+      await mkdir(path.join(cx.root, 'lib/wine/aarch64-unix'), { recursive: true });
+      for (const name of ['ntdll.so', 'libarm64ecfex.so']) await writeFile(path.join(cx.root, 'lib/wine/aarch64-unix', name), 'fixture');
+      const arm = await findCrossOverPreviewFex([cx.root]);
+      expect(arm).toMatchObject({ root: cx.root, serverViaWine: true, supportsArm64: true });
+      const script = crossOverWrapperScript(arm!, '/isolated/fex', 'xbox', 'd3dmetal');
+      expect(script).toContain(`'${cx.wine}' --bottle 'xbox' --ux-app wineserver -k`);
+      expect(script).toContain(`'${cx.wine}' --bottle 'xbox' --ux-app wineserver -w`);
+    } finally { reader.mockRestore(); }
+  });
   it('returns undefined when nothing is installed', async () => {
     expect(await findCrossOver([await tmp()])).toBeUndefined();
   });

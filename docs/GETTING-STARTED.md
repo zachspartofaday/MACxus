@@ -43,6 +43,13 @@ In **Settings**, choose **Install Nexus runtime** if no runtime is selected.
 MACxus verifies and installs it. Optionally install the **Highball** Wine engine
 for supported D3D12/Unreal games; CrossOver remains the default.
 
+**Wine engine** also detects CrossOver Preview in Applications. Choose **Preview
+(Rosetta)** for the regular build or **Preview (FEX/ARM)** for the ARM64 build.
+Each Preview mode uses a separate bottle. The FEX option appears when its ARM64
+engine is present; game compatibility can differ from Rosetta. Use **Refresh
+engine detection** after installing or updating a Preview build. Highball still
+requires regular CrossOver for its graphics libraries.
+
 Choose **Sign in with Xodus**. Sign-in uses MACxus's own window: Chrome is not
 needed. Use your Microsoft password, a code or the Authenticator app. Passkeys
 are not supported on macOS yet; choose **Other ways to sign in** if Microsoft asks
@@ -105,6 +112,13 @@ strumenti di sviluppo.
 In **Impostazioni**, scegli **Installa runtime Nexus** se non è selezionato alcun
 runtime. MACxus lo verifica e lo installa. Puoi anche installare il motore Wine
 **Highball** per i giochi D3D12/Unreal supportati; CrossOver resta il predefinito.
+
+**Motore Wine** rileva anche CrossOver Preview in Applicazioni. Scegli **Preview
+(Rosetta)** per la build normale o **Preview (FEX/ARM)** per quella ARM64. Ogni
+modalità Preview usa una bottle separata. L'opzione FEX è disponibile quando è
+presente il motore ARM64; la compatibilità può differire da Rosetta. Usa
+**Aggiorna rilevamento motori** dopo aver installato o aggiornato Preview.
+Highball richiede ancora CrossOver normale per le librerie grafiche.
 
 Scegli **Accedi con Xodus**. L'accesso avviene nella finestra di MACxus: Chrome non
 serve. Usa la password Microsoft, un codice o l'app Authenticator. Le passkey non

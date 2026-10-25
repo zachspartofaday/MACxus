@@ -214,6 +214,10 @@ describe('macOS Wine engine setting', () => {
     const reloaded = new StateStore(directory, 'darwin');
     await reloaded.load();
     expect(reloaded.settings.macEngine).toBe('highball');
+    await reloaded.setSettings({ macEngine: 'crossover-preview' });
+    const previewReloaded = new StateStore(directory, 'darwin');
+    await previewReloaded.load();
+    expect(previewReloaded.settings.macEngine).toBe('crossover-preview');
     const linuxDir = await mkdtemp(path.join(tmpdir(), 'xodus-nexus-engine-linux-'));
     created.push(linuxDir);
     const linux = new StateStore(linuxDir, 'linux');

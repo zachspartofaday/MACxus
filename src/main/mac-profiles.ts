@@ -8,7 +8,7 @@ export const MAC_PROFILE_ENV_KEYS = [
 ] as const;
 const ALLOWED_KEYS = new Set<string>(MAC_PROFILE_ENV_KEYS);
 const VALUE = /^[\w .:+-]{1,64}$/;
-const ENGINES = new Set<string>(['crossover', 'highball']);
+const ENGINES = new Set<string>(['crossover', 'crossover-preview', 'crossover-preview-fex', 'highball']);
 
 export interface MacProfile {
   engine?: MacEngine;
@@ -69,7 +69,10 @@ export function macProfileFor(profiles: MacProfiles, storeId: string | undefined
 }
 
 /** The profile's engine wins only when that engine is installed; otherwise the global setting applies. */
-export function effectiveMacEngine(setting: MacEngine | undefined, profile: MacProfile | undefined, installed: Record<MacEngine, boolean>): MacEngine {
+export function effectiveMacEngine(setting: MacEngine | undefined, profile: MacProfile | undefined, installed: Partial<Record<MacEngine, boolean>>): MacEngine {
+  // Preview is an explicit engine test; a bundled Highball recommendation
+  // must not silently replace the edition the user chose to try.
+  if (setting === 'crossover-preview' || setting === 'crossover-preview-fex') return setting;
   if (profile?.engine && installed[profile.engine]) return profile.engine;
   return setting ?? 'crossover';
 }
