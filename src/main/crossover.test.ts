@@ -47,6 +47,26 @@ describe('stripBuiltinMarker', () => {
 });
 
 describe('crossOverWrapperScript', () => {
+  it('forwards Wine logging through CrossOver and preserves explicit choices', async () => {
+    const base = await tmp();
+    const log = path.join(base, 'log');
+    const cx = await fakeInstall(base, path.join(base, 'calls'));
+    await writeFile(cx.wine, '#!/bin/sh\nprintf "%s" "$CX_DEBUGMSG" > "$LOG_FILE"\n', { mode: 0o755 });
+    const runner = path.join(base, 'runner');
+    await writeFile(runner, crossOverWrapperScript(cx, base, 'xbox', 'd3dmetal'), { mode: 0o700 });
+    const cases = [
+      [{}, '-fixme'],
+      [{ XODUS_NEXUS_VERBOSE_LOGS: '1' }, '+timestamp,+pid,+tid,+seh'],
+      [{ WINEDEBUG: '+loaddll' }, '+loaddll'],
+      [{ WINEDEBUG: '+loaddll', CX_DEBUGMSG: '-all' }, '-all'],
+      [{ XODUS_NEXUS_VERBOSE_LOGS: '1', CX_DEBUGMSG: '' }, ''],
+    ] as const;
+    for (const [environment, expected] of cases) {
+      const result = await processes.run(runner, ['game.exe'], { env: { PATH: process.env.PATH, LOG_FILE: log, ...environment } });
+      expect(result.code).toBe(0);
+      expect(await readFile(log, 'utf8')).toBe(expected);
+    }
+  });
   it('exports the bottle environment and handles launch, wait and stop', () => {
     const cx = { root: '/cx', wine: '/cx/bin/wine', wineserver: '/cx/bin/wineserver', cxbottle: '/cx/bin/cxbottle', version: '26.3' };
     const script = crossOverWrapperScript(cx, '/b', 'xbox', 'd3dmetal');
