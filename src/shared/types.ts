@@ -50,6 +50,8 @@ export interface BackendStatus {
   externalRoot: string;
   capabilities: BackendCapabilities;
   prerequisites: { git: boolean; cargo: boolean; rustc: boolean; protoc: boolean };
+  /** False when startup deliberately skipped developer-tool probes. */
+  prerequisitesChecked?: boolean;
   blockReason?: string;
   /** macOS: the "MACxus Local Signing" certificate exists, so the backend is signed with a stable identity. */
   signingIdentity: boolean;

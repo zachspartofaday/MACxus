@@ -4,6 +4,18 @@ import { demoSnapshot } from '../shared/demo-data';
 import { SettingsPage } from './App';
 
 describe('Settings diagnostics', () => {
+  it('hides unprobed developer tools for bundled and external packaged backends', () => {
+    for (const source of ['bundled', 'external'] as const) {
+      const data = demoSnapshot(); data.platform = 'darwin'; data.backend.source = source;
+      data.backend.delivery = source === 'bundled' ? 'bundled' : undefined;
+      data.backend.prerequisitesChecked = false;
+      data.backend.prerequisites = { git: false, cargo: false, rustc: false, protoc: false };
+      const html = renderToStaticMarkup(<SettingsPage data={data} toast={() => {}} />);
+      expect(html).not.toContain('Build dependencies');
+      expect(html).not.toContain('D-Bus development packages');
+      expect(html).toContain('Build backend from source');
+    }
+  });
   it('explains that explicit sign-out also removes the local device registration', () => {
     const html = renderToStaticMarkup(<SettingsPage data={demoSnapshot()} toast={() => {}} />);
     expect(html).toContain('title="Remove saved sign-in credentials and local device registration. Games and saves are kept."');

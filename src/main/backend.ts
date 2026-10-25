@@ -67,6 +67,7 @@ export class BackendManager {
       externalRoot,
       capabilities: EMPTY_CAPABILITIES,
       prerequisites: { git: false, cargo: false, rustc: false, protoc: false },
+      prerequisitesChecked: false,
       signingIdentity: false,
     };
   }
@@ -201,6 +202,7 @@ export class BackendManager {
       this.commandExists('git'), this.commandExists('cargo'), this.commandExists('rustc'), this.commandExists('protoc'),
     ]);
     this.status.prerequisites = { git, cargo, rustc, protoc };
+    this.status.prerequisitesChecked = true;
 
     const pointer = await this.readPointer();
     if (pointer) {
@@ -324,6 +326,7 @@ export class BackendManager {
     if (this.bundle) {
       const [git, cargo, rustc, protoc] = await Promise.all(['git', 'cargo', 'rustc', 'protoc'].map(command => this.commandExists(command)));
       this.status.prerequisites = { git, cargo, rustc, protoc };
+      this.status.prerequisitesChecked = true;
     }
     if (!this.status.prerequisites.git || !this.status.prerequisites.cargo || !this.status.prerequisites.rustc || !this.status.prerequisites.protoc) {
       throw new Error('Git, Cargo, Rust, or protoc is missing. Check the build dependencies in Settings.');
