@@ -48,6 +48,21 @@ needed. Use your Microsoft password, a code or the Authenticator app. Passkeys
 are not supported on macOS yet; choose **Other ways to sign in** if Microsoft asks
 for one. You need to own the game or have an appropriate PC Game Pass subscription.
 
+### Keychain access prompts
+
+Xodus stores device and account credentials in macOS Keychain. macOS can ask for
+access separately for different records and for `xodus-cli` and `xodus-service`.
+For a verified MACxus installation, **Always Allow** remembers a grant for that
+executable and item; **Allow** grants the current request. A locked Keychain may
+still need unlocking.
+
+Ad-hoc-signed beta backends can prompt again when their binaries change in an
+update. A maintainer can use [stable backend signing](MAC-BACKEND.md#optional-stable-backend-signing)
+to preserve the executables' identity across builds. Creating a local certificate
+and restarting a packaged app does not change its bundled signatures. Switching
+to a signed build may still require initial grants. You do not need to delete
+credentials, disable Keychain protection, or allow every application access.
+
 ### 4. Install a game
 
 Choose a game in **My Library** or **Store**, then choose the drive/folder for it.
@@ -110,6 +125,22 @@ Scegli **Accedi con Xodus**. L'accesso avviene nella finestra di MACxus: Chrome 
 serve. Usa la password Microsoft, un codice o l'app Authenticator. Le passkey non
 sono ancora supportate su macOS: scegli **Altri modi per accedere** se Microsoft
 ne richiede una. Devi possedere il gioco o avere un abbonamento PC Game Pass adatto.
+
+### Richieste di accesso al Portachiavi
+
+Xodus conserva le credenziali del dispositivo e dell’account nel Portachiavi di
+macOS. Possono comparire richieste distinte per ogni voce e per `xodus-cli` e
+`xodus-service`. Per un’installazione verificata di MACxus, **Consenti sempre**
+memorizza il permesso per quell’eseguibile e quella voce; **Consenti** vale per
+la richiesta corrente. Un Portachiavi bloccato può comunque richiedere lo sblocco.
+
+I backend beta con firma ad-hoc possono richiedere nuovamente il permesso dopo
+un aggiornamento dei binari. Chi prepara la release può usare la
+[firma stabile del backend](MAC-BACKEND.md#optional-stable-backend-signing).
+Creare un certificato locale e riavviare l’app confezionata non modifica le firme
+incluse. Il primo passaggio a una build firmata può richiedere nuovi permessi.
+Non occorre eliminare credenziali, disattivare la protezione del Portachiavi o
+consentire l’accesso a tutte le applicazioni.
 
 ### 4. Installa un gioco
 
