@@ -6,6 +6,7 @@ export const italianMessages = {
   "Choose a supported package from this Store offer before installing.": "Scegli un pacchetto supportato da questa offerta dello Store prima di installare.",
   "Download size": "Dimensione del download",
   "Installed size": "Dimensione installata",
+  "Measured from files in the game folder. Linked files outside it are excluded.": "Misurata dai file nella cartella del gioco. I file esterni collegati sono esclusi.",
   "Not reported": "Non indicata",
   "About {value0}": "Circa {value0}",
   "Microsoft Store estimates. Actual sizes can change with updates and selected content.": "Stime di Microsoft Store. Le dimensioni effettive possono cambiare con gli aggiornamenti e i contenuti selezionati.",

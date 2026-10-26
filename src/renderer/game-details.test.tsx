@@ -42,6 +42,14 @@ it('shows the same published size segments beside Play for installed games', () 
   expect(html.indexOf('Download size')).toBeGreaterThan(html.indexOf('Last played'));
 });
 
+it('prefers measured installation bytes over Store estimates, independently of catalog failures', () => {
+  const html = renderToStaticMarkup(<GameDetailsContent game={game} details={{ ...details, size: { installBytes: 2 * 1024 ** 3 } }} installedBytes={3 * 1024 ** 3} metadataError play={<button>Play</button>} back={() => {}} refresh={() => {}} />);
+  expect(html).toContain('>3.0 GiB</strong>'); expect(html).not.toContain('About 2.0 GiB');
+  expect(html).toContain('Measured from files in the game folder.'); expect(html).toContain('>Play</button>');
+  const offline = renderToStaticMarkup(<GameDetailsContent game={game} installedBytes={0} metadataError play={<button>Play</button>} back={() => {}} refresh={() => {}} />);
+  expect(offline).toContain('>0 B</strong>');
+});
+
 it('keeps the size dialog informational, including honest missing-data text', () => {
   const html = renderToStaticMarkup(<PackageSizeDialog title="A game" value={{ downloadBytes: 1024 ** 3 }} close={() => {}} />);
   expect(html).toContain('role="dialog"'); expect(html).toContain('aria-modal="true"');

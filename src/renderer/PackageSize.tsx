@@ -43,12 +43,14 @@ export function PackageSizeInfo({ title, value }: { title: string; value?: Size 
   </>;
 }
 
-export function PackageSize({ value, loading = false, compact = false, stats = false }: { value?: Size; loading?: boolean; compact?: boolean; stats?: boolean }) {
+export function PackageSize({ value, loading = false, compact = false, stats = false, installedBytes, installedLoading = false }: { value?: Size; loading?: boolean; compact?: boolean; stats?: boolean; installedBytes?: number; installedLoading?: boolean }) {
   const { t } = useI18n();
   const estimate = (bytes?: number) => typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes > 0
     ? t("About {value0}", { value0: formatPackageBytes(bytes) }) : loading ? t("Loading…") : t("Not reported");
+  const measured = typeof installedBytes === 'number' && Number.isSafeInteger(installedBytes) && installedBytes >= 0;
+  const installed = measured ? formatPackageBytes(installedBytes!) : installedLoading ? t("Loading…") : estimate(value?.installBytes);
   if (stats) return <>{([['downloadBytes', 'Download size'], ['installBytes', 'Installed size']] as const).map(([field, label]) =>
-    <div className="gd-stat gd-size-stat" key={field} aria-live="polite"><div><span>{t(label)}</span><strong>{estimate(value?.[field])}</strong></div></div>)}</>;
+    <div className="gd-stat gd-size-stat" key={field} aria-live="polite" title={field === 'installBytes' && measured ? t("Measured from files in the game folder. Linked files outside it are excluded.") : undefined}><div><span>{t(label)}</span><strong>{field === 'installBytes' ? installed : estimate(value?.[field])}</strong></div></div>)}</>;
   return <span className={compact ? 'package-size compact' : 'package-size'} aria-live={compact ? undefined : 'polite'}>
     <span>{t("Download size")}: <strong>{estimate(value?.downloadBytes)}</strong></span>
     {!compact || value?.installBytes ? <span>{t("Installed size")}: <strong>{estimate(value?.installBytes)}</strong></span> : null}

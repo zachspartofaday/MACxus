@@ -81,11 +81,13 @@ interface ContentProps extends PageProps {
   metadataError?: boolean;
   installPlan?: InstallPlan;
   installSizeLoading?: boolean;
+  installedBytes?: number;
+  installedSizeLoading?: boolean;
   refresh: () => void;
 }
 
 /** Descriptive data never gates Play or changes package/licensing decisions. */
-export function GameDetailsContent({ game, back, play, manage, status, notices, technical, achievements, installPreview, installPlan, installSizeLoading, details, activity, metadataLoading, activityLoading, metadataError, refresh }: ContentProps) {
+export function GameDetailsContent({ game, back, play, manage, status, notices, technical, achievements, installPreview, installPlan, installSizeLoading, installedBytes, installedSizeLoading, details, activity, metadataLoading, activityLoading, metadataError, refresh }: ContentProps) {
   const { t, language } = useI18n();
   const [gallery, setGallery] = useState<number>();
   const [expanded, setExpanded] = useState(false);
@@ -143,7 +145,7 @@ export function GameDetailsContent({ game, back, play, manage, status, notices, 
         <div className="button-row gd-play-controls">{play}</div>
         <div className="gd-stat"><Clock3 /><div><span>{t("Xbox time played")}{' '}<button className="gd-refresh" aria-label={t("Refresh Xbox activity")} disabled={activityLoading} onClick={refresh}>{activityLoading ? <LoaderCircle className="spin" /> : <RefreshCw />}</button></span><strong>{activityLoading && !activity ? t("Loading…") : formatMinutes(activity?.minutesPlayed, t)}</strong><small>{activityLoading ? t("Reading Xbox activity…") : activityNote(activity, t)}</small></div></div>
         <div className="gd-stat gd-last-played"><div><span>{t("Last played")}</span><strong>{activityLoading && !activity ? t("Loading…") : lastPlayed}</strong></div></div>
-        {(!installPreview || packages.length < 2) ? <PackageSize value={(packages.length === 1 ? packages[0].size : undefined) ?? details?.size} loading={metadataLoading || installSizeLoading} stats /> : null}
+        {(!installPreview || packages.length < 2) ? <PackageSize value={(packages.length === 1 ? packages[0].size : undefined) ?? details?.size} loading={metadataLoading || installSizeLoading} installedBytes={installedBytes} installedLoading={installedSizeLoading} stats /> : null}
         {manage === undefined ? null : <details ref={manageRef} className="gd-actions" data-game-menu={manageOpen ? '' : undefined} onToggle={event => setManageOpen(event.currentTarget.open)}><summary aria-label={t("More game actions")}><MoreHorizontal /><span>{t("Manage")}</span></summary><div role="menu" aria-label={t("Manage game")} onClick={event => { if ((event.target as HTMLElement).closest('button:not(:disabled)')) closeManage(); }}>{manage}</div></details>}
       </section>
       {installPreview && packages.length > 1 ? <section className="gd-package-sizes"><h2>{t("Package sizes")}</h2>{packages.map(choice => <div key={choice.contentId}><strong>{choice.title}</strong><PackageSize value={choice.size} /></div>)}<p className="fine-print">{t("Microsoft Store estimates. Actual sizes can change with updates and selected content.")}</p></section> : null}
@@ -171,7 +173,19 @@ export function GameDetails(props: PageProps & { data: AppSnapshot }) {
   const [activityLoading, setActivityLoading] = useState(true);
   const [installPlan, setInstallPlan] = useState<InstallPlan>();
   const [installSizeLoading, setInstallSizeLoading] = useState(false);
+  const [installedBytes, setInstalledBytes] = useState<number>();
+  const [installedSizeLoading, setInstalledSizeLoading] = useState(false);
   const request = useRef(0);
+  useEffect(() => {
+    let live = true; setInstalledBytes(undefined); setInstalledSizeLoading(false);
+    if (!props.installPreview && game.path) {
+      setInstalledSizeLoading(true);
+      void window.launcher.getInstalledGameSize(game.id).then(value => { if (live) setInstalledBytes(value); })
+        .catch(() => { /* Folder metadata is optional and never gates Play. */ })
+        .finally(() => { if (live) setInstalledSizeLoading(false); });
+    }
+    return () => { live = false; };
+  }, [props.installPreview, game.id, game.path, game.installedVersion]);
   useEffect(() => {
     let live = true; setDetails(undefined); setMetadataLoading(true); setMetadataError(false);
     window.launcher.getGameDetails(game.id).then(value => { if (live) setDetails(value); }).catch(() => { if (live) setMetadataError(true); }).finally(() => { if (live) setMetadataLoading(false); });
@@ -192,5 +206,5 @@ export function GameDetails(props: PageProps & { data: AppSnapshot }) {
     void window.launcher.getGameActivity(game.id, refresh).then(value => { if (request.current === id) setActivity(value); }).catch(() => { if (request.current === id) setActivity({ status: 'error' }); }).finally(() => { if (request.current === id) setActivityLoading(false); });
   }, [game.id, data.auth.username, data.auth.stored, data.auth.running, data.backend.binaryPath]);
   useEffect(() => { setActivity(undefined); loadActivity(); return () => { request.current++; }; }, [loadActivity]);
-  return <GameDetailsContent {...props} details={details} activity={activity} metadataLoading={metadataLoading} metadataError={metadataError} installPlan={installPlan} installSizeLoading={installSizeLoading} activityLoading={activityLoading} refresh={() => loadActivity(true)} achievements={<Achievements gameId={game.id} title={game.title} data={data} />} />;
+  return <GameDetailsContent {...props} details={details} activity={activity} metadataLoading={metadataLoading} metadataError={metadataError} installPlan={installPlan} installSizeLoading={installSizeLoading} installedBytes={installedBytes} installedSizeLoading={installedSizeLoading} activityLoading={activityLoading} refresh={() => loadActivity(true)} achievements={<Achievements gameId={game.id} title={game.title} data={data} />} />;
 }
