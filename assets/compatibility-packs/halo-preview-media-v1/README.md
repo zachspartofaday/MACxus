@@ -13,9 +13,10 @@ Preview interface adaptations. The winevideo author's licensing statement is at
 https://github.com/Jfishin/winevideo/wiki/Building-and-Patch-Provenance#licensing-and-attribution
 
 Complete build instructions and limitations:
-https://github.com/zachspartofaday/MACxus/blob/fix/halo-preview-software-video/docs/HALO-PREVIEW-MEDIA.md
+https://github.com/zachspartofaday/MACxus/blob/main/docs/HALO-PREVIEW-MEDIA.md
 The build recipe is included under `source/build-scripts/`; restore it into the
-repository's `scripts/` directory when reconstructing the source layout. The
+repository's `scripts/` directory and `source/src/shared/` into `src/shared/`
+when reconstructing the source layout. The
 corresponding patch, manifest and complete Wine source archive are supplied with
 this pack, so the original source download need not remain available to rebuild.
 

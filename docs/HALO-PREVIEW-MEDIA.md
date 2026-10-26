@@ -7,6 +7,10 @@ playback with minimal logging. Later cinematics still need testing. This does no
 
 ## Automatic compatibility pack
 
+Halo is the first entry in the [game compatibility-pack catalog](GAME-COMPATIBILITY-PACKS.md).
+The shared handler reads its Store/build route and declarative settings from the
+manifest; its existing engine cache and bottle paths are preserved.
+
 macOS distribution builds include the two verified Wine DLLs, their LGPL license,
 complete original source archive and source patch. Users do not need compilers
 or manual engine/configuration edits. On Halo's first launch, MACxus verifies the

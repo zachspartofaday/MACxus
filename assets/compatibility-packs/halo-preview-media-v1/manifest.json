@@ -9,7 +9,6 @@
     "mfplat.dll": "0a20d436ae6dca9d70484758e04bea84f52be31a6a3040403e588ecc0d67e61f",
     "winegstreamer.dll": "d97c44a717c7d3dfdb547f202477c1d42c3d3670ae911df59cda70c7e8875b71"
   },
-  "unixSHA256": "872fa796283e926d906629dfa5d288f2305b5d9114e1a483413720302deb4511",
   "dlls": {
     "mfplat.dll": "826ea432ce8b3d941cafc3f0d8266389c342988d439573f82d7ab2bbe9246328",
     "winegstreamer.dll": "acc50f2fbc7c0f2a933e531f4ec4210eb26db3aa142d2a3203391a35dc3448f3"
@@ -18,7 +17,8 @@
     "url": "https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz",
     "sha256": "ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872",
     "wineSubdirectory": "sources/wine",
-    "exactPreviewSources": false
+    "exactPreviewSources": false,
+    "archive": "crossover-sources-26.3.0.tar.gz"
   },
   "patch": {
     "path": "assets/runtime-patches/crossover-preview-halo-mf-software-output.patch",
@@ -47,5 +47,43 @@
     "mfplat.dll": 1792987496,
     "winegstreamer.dll": 1792989507
   },
-  "licenseSHA256": "e237fa56668030e928551ddd60f05df5fe957f75eab874bbd017e085ed722e7c"
+  "licenseSHA256": "e237fa56668030e928551ddd60f05df5fe957f75eab874bbd017e085ed722e7c",
+  "schemaVersion": 1,
+  "kind": "wine-engine-overlay",
+  "recipe": "wine-pe-v1",
+  "name": "Halo movie compatibility",
+  "engineDirectory": "verified-engine-v2",
+  "appName": "MACxus Halo Video.app",
+  "unixLibraries": {
+    "winegstreamer.so": "872fa796283e926d906629dfa5d288f2305b5d9114e1a483413720302deb4511"
+  },
+  "environment": {
+    "MACXUS_MF_SOFTWARE_OUTPUT": "1"
+  },
+  "configuration": [
+    {
+      "kind": "unreal-ini",
+      "project": "Meteorite",
+      "platform": "Windows",
+      "file": "Engine.ini",
+      "section": "SystemSettings",
+      "values": {
+        "Electra.Win.H264UseOldOutputPath": "1",
+        "Electra.Win.H265UseOldOutputPath": "1"
+      },
+      "readOnly": true
+    },
+    {
+      "kind": "unreal-ini",
+      "project": "Meteorite",
+      "platform": "WinGDK",
+      "file": "Engine.ini",
+      "section": "SystemSettings",
+      "values": {
+        "Electra.Win.H264UseOldOutputPath": "1",
+        "Electra.Win.H265UseOldOutputPath": "1"
+      },
+      "readOnly": true
+    }
+  ]
 }

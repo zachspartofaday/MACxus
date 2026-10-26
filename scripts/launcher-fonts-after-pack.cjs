@@ -5,8 +5,8 @@ module.exports = async function afterPack(context) {
   if (context.electronPlatformName === 'darwin') {
     const { verifyPackagedRuntimeDlls } = await import('./mac-runtime-dlls.mjs');
     await verifyPackagedRuntimeDlls(path.join(context.appOutDir, 'MACxus.app', 'Contents', 'Resources', 'app.asar'));
-    const { verifyPackagedHaloMediaPack } = await import('./halo-media-pack.mjs');
-    await verifyPackagedHaloMediaPack(path.join(context.appOutDir, 'MACxus.app', 'Contents', 'Resources', 'app.asar'));
+    const { verifyPackagedCompatibilityPacks } = await import('./compatibility-packs.mjs');
+    await verifyPackagedCompatibilityPacks(path.join(context.appOutDir, 'MACxus.app', 'Contents', 'Resources', 'app.asar'));
     const { readBundledBackend } = await import('../dist-electron/main/bundled-backend.js');
     const backend = path.join(context.appOutDir, 'MACxus.app', 'Contents', 'Resources', 'backend');
     const { manifest } = await readBundledBackend(backend, 'arm64');

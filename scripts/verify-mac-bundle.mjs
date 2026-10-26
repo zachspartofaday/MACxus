@@ -5,9 +5,12 @@ import path from 'node:path';
 import { BackendManager } from '../dist-electron/main/backend.js';
 import { verifyPackagedRuntimeDlls } from './mac-runtime-dlls.mjs';
 
+import { verifyPackagedCompatibilityPacks } from './compatibility-packs.mjs';
+
 const app = process.argv[2];
 if (!app || process.argv.length !== 3) throw Error('Usage: verify-mac-bundle.mjs MACxus.app');
 await verifyPackagedRuntimeDlls(path.resolve(app, 'Contents/Resources/app.asar'));
+await verifyPackagedCompatibilityPacks(path.resolve(app, 'Contents/Resources/app.asar'));
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'macxus-first-launch-'));
 const oldPath = process.env.PATH;
 try {
