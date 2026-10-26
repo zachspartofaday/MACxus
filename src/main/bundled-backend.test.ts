@@ -35,7 +35,7 @@ it('makes a fresh Mac profile ready without probing developer tools or writing a
   const profile = path.join(f.root, 'fresh-profile');
   const manager = new BackendManager(profile, '', () => {}, () => false, fetch, 'darwin', { root: f.root, arch: 'arm64' });
   const status = await manager.refresh();
-  expect(status).toMatchObject({ available: true, source: 'bundled', delivery: 'bundled', linuxRunPatch: backendLock.macCompatibility });
+  expect(status).toMatchObject({ available: true, source: 'bundled', delivery: 'bundled', prerequisitesChecked: false, linuxRunPatch: backendLock.macCompatibility });
   expect(status.capabilities.streamingBandwidthLimit).toBe(true);
   await manager.ensureSigned(); await manager.checkUpdate();
   expect(vi.mocked(run).mock.calls.every(([command, args]) => command.endsWith('/xodus-cli') && args.includes('--help'))).toBe(true);
