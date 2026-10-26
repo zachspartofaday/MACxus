@@ -1,0 +1,36 @@
+name: Media pack reproducibility
+on:
+  pull_request:
+    paths: ['assets/compatibility-packs/**', 'assets/runtime-patches/crossover-preview-halo-mf-software-output.patch', 'src/shared/compatibility-pack-schema.*', 'scripts/compatibility-pack-build.*', 'scripts/compatibility-packs.*', 'scripts/prepare-compatibility-packs.mjs', 'scripts/preview-media-experiment.lock.json', '.github/workflows/media-pack-reproducibility.yml']
+  push:
+    branches: [main, 'fix/**']
+    paths: ['assets/compatibility-packs/**', 'assets/runtime-patches/crossover-preview-halo-mf-software-output.patch', 'src/shared/compatibility-pack-schema.*', 'scripts/compatibility-pack-build.*', 'scripts/compatibility-packs.*', 'scripts/prepare-compatibility-packs.mjs', 'scripts/preview-media-experiment.lock.json', '.github/workflows/media-pack-reproducibility.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reproducibility:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install Wine PE build tools
+        run: brew install bison mingw-w64
+      - run: npm ci
+      - name: Test the stripped PE source-path contract
+        run: node --test scripts/compatibility-pack-build.test.mjs
+      - name: Rebuild all registered packs twice in different temporary roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          first_root=$(mktemp -d "$RUNNER_TEMP/macxus-first-XXXXXXXX")
+          second_root=$(mktemp -d "$RUNNER_TEMP/macxus-second-longer-root-XXXXXXXX")
+          trap 'rm -rf "$first_root" "$second_root"' EXIT
+          TMPDIR="$first_root" npm run prepare:mac-media-pack -- --rebuild
+          TMPDIR="$second_root" npm run prepare:mac-media-pack -- --rebuild

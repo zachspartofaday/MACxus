@@ -28,7 +28,7 @@ export function parseCompatibilityCatalog(value) {
 }
 export function parseCompatibilityManifest(value, entry) {
   route(value);
-  check(value.schemaVersion === 1 && value.kind === 'wine-engine-overlay' && value.recipe === 'wine-pe-v1', 'schema or handler');
+  check(value.schemaVersion === 1 && value.kind === 'wine-engine-overlay' && value.recipe === 'wine-pe-v1' && value.buildPathPolicy === 'relative-source-v1', 'schema or handler');
   if (entry) check(['id', 'storeId', 'engine', 'version', 'buildTag'].every(key => value[key] === entry[key]), 'manifest/catalog mismatch');
   check(text(value.name) && component(value.engineDirectory) && value.engineDirectory.toLowerCase() !== 'bottles', 'name or engine directory');
   check(typeof value.appName === 'string' && /^MACxus [A-Za-z0-9 ._-]{1,64}\.app$/.test(value.appName) && !value.appName.includes('..'), 'private application name');

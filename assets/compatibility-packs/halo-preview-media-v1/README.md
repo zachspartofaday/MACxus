@@ -5,7 +5,11 @@ Wine sources using the source patch at
 `assets/runtime-patches/crossover-preview-halo-mf-software-output.patch`.
 The complete original source archive is included in `source/`, and the LGPL
 license is `COPYING.LIB`. The manifest records all source/artifact hashes, the
-accepted Preview build and the per-DLL reproducible build timestamps.
+accepted Preview build and the per-DLL reproducible build timestamps. The
+`relative-source-v1` policy invokes configure using `../sources/wine/configure`
+from `build/`, preserving the original tested `__FILE__` literals without embedding
+a random absolute build path. `--rebuild` forces a clean source build for
+reproducibility checks; both accepted DLL hashes remain unchanged.
 
 Attribution: Wine/CodeWeavers; Jfishin/winevideo patches 0004, 0005 and 0007
 (commit 523a3dd7d5af0a5feec34a7433180129bd9ece6a); MACxus's per-process opt-in and

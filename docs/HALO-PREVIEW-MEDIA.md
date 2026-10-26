@@ -65,6 +65,12 @@ matches Preview; keep the experiment isolated to Halo.
 downloads the checksum-pinned source archive, applies and verifies the patch,
 builds the two PE DLLs and requires the accepted output hashes. The build sets
 `SOURCE_DATE_EPOCH` separately for each DLL using the recorded tested timestamps.
+The manifest's `relative-source-v1` build-path policy invokes configure as
+`../sources/wine/configure` from the adjacent `build/` directory. Wine preserves
+that spelling in its Makefile; `libs/strmbase` uses it in `__FILE__` string literals
+which survive stripping. Do not invoke configure with an absolute source path.
+This relative policy reproduces the original tested DLL hashes without requiring
+a shared fixed temporary directory or a changed payload.
 Generated DLLs and the source archive remain ignored by Git, and the actual app
 ASAR is checked for both DLLs, the complete source archive and the LGPL license.
 A different toolchain that produces different bytes requires candidate
@@ -73,6 +79,11 @@ revalidation and a manifest update; packaging never accepts it silently.
 For a cached official source archive, add `-- --source-archive /path/to/archive`
 to the preparation command. Maintainers may reuse an exact accepted build with
 `--dll-dir /path/to/dlls`; both hashes are checked before payload files change.
+Use `--rebuild` to bypass cached DLLs and force a fresh source build; it cannot be
+combined with `--dll-dir`. Repeat with a different `TMPDIR` to verify the path
+policy. Both runs must match every accepted manifest hash. PR CI runs a stripped
+PE `__FILE__` regression on Linux; the media-pack workflow additionally builds
+the actual Wine DLLs twice under different temporary roots on macOS.
 
 ### Manual source reproduction
 
@@ -87,7 +98,8 @@ MinGW-w64's `x86_64-w64-mingw32-strip`. Homebrew Bison is keg-only, so put its
    source directory, apply
    `assets/runtime-patches/crossover-preview-halo-mf-software-output.patch`
    using `patch -p1`. Verify the three resulting hashes in the lock.
-3. Make a separate build directory alongside the extracted Wine source and run:
+3. From the experiment root, create `build/` beside `sources/`, then `cd build`.
+   Keep configure's path relative exactly as shown, and run:
 
    ```sh
    CC="clang -arch x86_64" CXX="clang++ -arch x86_64" \
@@ -98,8 +110,10 @@ MinGW-w64's `x86_64-w64-mingw32-strip`. Homebrew Bison is keg-only, so put its
      --without-gphoto --without-sane --without-v4l2 --without-pcap --without-usb \
      --without-capi --without-freetype --without-gnutls --without-opengl \
      --without-vulkan --disable-tests
-   make -j8 dlls/winegstreamer/x86_64-windows/winegstreamer.dll \
+   SOURCE_DATE_EPOCH=1792987496 make -j8 \
      dlls/mfplat/x86_64-windows/mfplat.dll
+   SOURCE_DATE_EPOCH=1792989507 make -j8 \
+     dlls/winegstreamer/x86_64-windows/winegstreamer.dll
    ```
 
 4. Copy those two PE DLLs into a separate output directory and strip their debug

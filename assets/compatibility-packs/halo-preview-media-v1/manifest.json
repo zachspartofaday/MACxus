@@ -85,5 +85,6 @@
       },
       "readOnly": true
     }
-  ]
+  ],
+  "buildPathPolicy": "relative-source-v1"
 }
