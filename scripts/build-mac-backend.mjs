@@ -63,7 +63,7 @@ try {
   cargo(['test', ...features, '-p', 'xodus-service', 'store_']);
 } finally {
   if (oldTmp === undefined) delete env.TMPDIR; else env.TMPDIR = oldTmp;
-  await detachMacTestVolume(fixtureRoot);
+  await detachMacTestVolume(fixtureRoot, { imagePath: image });
   await fs.rm(image);
 }
 cargo(['build', ...features, '-p', 'xodus-cli', '-p', 'xodus-service']);

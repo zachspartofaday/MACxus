@@ -36,3 +36,63 @@ test('permission and tool failures propagate immediately', async () => {
     assert.equal(calls, 1);
   }
 });
+
+const gone = () => Object.assign(new Error('detach failed'), { status: 1, stderr: 'hdiutil: detach failed - No such file or directory\n' });
+function inventoryRunner(images, { busyFirst = false } = {}) {
+  const calls = [];
+  const run = (tool, args, options) => {
+    calls.push([tool, args, options]);
+    if (args[0] === 'detach') {
+      if (busyFirst && calls.length === 1) throw Object.assign(new Error('Resource busy'), { status: 16 });
+      throw gone();
+    }
+    if (tool === 'hdiutil' && args[0] === 'info') return '<plist>inventory</plist>';
+    assert.equal(tool, 'plutil'); assert.deepEqual(args, ['-extract', 'images', 'json', '-o', '-', '-']);
+    assert.equal(options.input, '<plist>inventory</plist>');
+    return typeof images === 'string' ? images : JSON.stringify(images);
+  };
+  return { calls, run };
+}
+
+test('busy detach followed by a missing mount succeeds only with authoritative image absence', async () => {
+  const { calls, run } = inventoryRunner([], { busyFirst: true });
+  const waits = [];
+  await detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => file, run, wait: async ms => waits.push(ms), log: () => {} });
+  assert.deepEqual(waits, [250]);
+  assert.deepEqual(calls.map(([tool, args]) => [tool, args[0]]), [['hdiutil', 'detach'], ['hdiutil', 'detach'], ['hdiutil', 'info'], ['plutil', '-extract']]);
+  assert.ok(!JSON.stringify(calls).includes('force'));
+});
+
+test('an attached image, including an unmounted device, still fails cleanup', async () => {
+  for (const images of [
+    [{ 'image-path': '/fixture.sparseimage', 'system-entities': [] }],
+    [{ 'image-path': '/another.sparseimage', 'system-entities': [{ 'mount-point': '/fixture' }] }],
+  ]) {
+    const { run } = inventoryRunner(images);
+    await assert.rejects(detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => file, run, log: () => {} }), error => error.status === 1);
+  }
+});
+
+test('image identity comparison resolves canonical aliases', async () => {
+  const { run } = inventoryRunner([{ 'image-path': '/private/tmp/fixture.sparseimage', 'system-entities': [] }]);
+  await assert.rejects(detachMacTestVolume('/fixture', { imagePath: '/tmp/fixture.sparseimage', canonical: async file => file.replace(/^\/tmp\//, '/private/tmp/'), run }), error => error.status === 1);
+});
+
+test('unrelated RAM images do not require filesystem identity resolution', async () => {
+  const { run } = inventoryRunner([{ 'image-path': 'ram://2048', 'system-entities': [{ 'mount-point': '/another-mount' }] }]);
+  await detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => { assert.equal(file, '/fixture.sparseimage'); return file; }, run });
+});
+
+test('missing or malformed inventory, identity failures and real errors are never treated as detached', async () => {
+  for (const images of ['not-json', {}, [{}], [{ 'image-path': '/fixture.sparseimage' }], [{ 'image-path': '', 'system-entities': [] }], [{ 'image-path': 'unknown-source', 'system-entities': [] }], [{ 'image-path': '/other', 'system-entities': [null] }], [{ 'image-path': '/other', 'system-entities': [{ 'mount-point': 7 }] }]]) {
+    const { run } = inventoryRunner(images);
+    await assert.rejects(detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => file, run }));
+  }
+  for (const failure of [Object.assign(new Error('Denied'), { status: 1, stderr: 'Permission denied' }), Object.assign(new Error('Tool missing'), { code: 'ENOENT' })]) {
+    let calls = 0;
+    await assert.rejects(detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => file, run: () => { calls++; throw failure; } }), error => error === failure);
+    assert.equal(calls, 1);
+  }
+  const { run } = inventoryRunner([{ 'image-path': '/unresolvable', 'system-entities': [] }]);
+  await assert.rejects(detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => { if (file === '/unresolvable') throw Error('Identity unavailable'); return file; }, run }), /Identity unavailable/);
+});
