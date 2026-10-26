@@ -3,16 +3,20 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { HALO_STORE_ID, haloMovieSettings, prepareGameCompatibilityPack, type CompatibilityPackDeps, type CompatibilityPackRequest } from './game-compatibility-pack.js';
+import { updateIniSettings, prepareGameCompatibilityPack, type CompatibilityPackDeps, type CompatibilityPackRequest } from './game-compatibility-pack.js';
 import { prepareMacRunner, type MacRunnerDeps } from './mac-engine.js';
 
+const HALO_STORE_ID = '9N683TDT5M7R';
+const haloValues = { 'Electra.Win.H264UseOldOutputPath': '1', 'Electra.Win.H265UseOldOutputPath': '1' };
+const haloMovieSettings = (text: string) => updateIniSettings(text, 'SystemSettings', haloValues);
 const temporary: string[] = [];
 const hash = (data: string) => createHash('sha256').update(data).digest('hex');
 afterEach(async () => { await Promise.all(temporary.splice(0).map(root => fs.rm(root, { recursive: true, force: true }))); });
 async function fixture() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'halo-pack-')); temporary.push(root);
   const app = path.join(root, 'Preview.app'), cxRoot = path.join(app, 'Contents/SharedSupport/CrossOver');
-  const assets = path.join(root, 'assets'), data = path.join(root, 'data');
+  const catalogRoot = path.join(root, 'assets');
+  const assets = path.join(catalogRoot, 'halo-preview-media-v1'), data = path.join(root, 'data');
   await fs.mkdir(path.join(cxRoot, 'lib/wine/x86_64-windows'), { recursive: true });
   await fs.mkdir(path.join(cxRoot, 'lib/wine/x86_64-unix'), { recursive: true });
   await fs.mkdir(path.join(cxRoot, 'etc'), { recursive: true });
@@ -25,15 +29,19 @@ async function fixture() {
     await fs.writeFile(path.join(cxRoot, 'lib/wine/x86_64-windows', name), `original-${name}`);
     await fs.writeFile(path.join(assets, 'payload', name), `patched-${name}`);
   }
-  await fs.writeFile(path.join(assets, 'manifest.json'), JSON.stringify({ id: 'halo-preview-media-v1', storeId: HALO_STORE_ID, engine: 'crossover-preview', version: '20261015', buildTag: 'tested-preview', unixSHA256: hash('unix-library'), originalDLLs: Object.fromEntries(names.map(n => [n, hash(`original-${n}`)])), dlls: Object.fromEntries(names.map(n => [n, hash(`patched-${n}`)])) }));
+  const manifest = JSON.parse(await fs.readFile(new URL('../../assets/compatibility-packs/halo-preview-media-v1/manifest.json', import.meta.url), 'utf8'));
+  Object.assign(manifest, { buildTag: 'tested-preview', unixLibraries: { 'winegstreamer.so': hash('unix-library') }, originalDLLs: Object.fromEntries(names.map(n => [n, hash(`original-${n}`)])), dlls: Object.fromEntries(names.map(n => [n, hash(`patched-${n}`)])) });
+  await fs.writeFile(path.join(assets, 'manifest.json'), JSON.stringify(manifest));
+  const route = Object.fromEntries(['id', 'storeId', 'engine', 'version', 'buildTag'].map(key => [key, manifest[key]]));
+  await fs.writeFile(path.join(catalogRoot, 'catalog.json'), JSON.stringify({ schemaVersion: 1, packs: [route] }));
   const calls: Array<[string, string[]]> = [];
-  const deps: CompatibilityPackDeps = { assetRoot: assets, execute: async (command, args) => {
+  const deps: CompatibilityPackDeps = { assetRoot: catalogRoot, execute: async (command, args) => {
     calls.push([command, args]);
     if (command.endsWith('/ditto')) await fs.cp(args[3], args[4], { recursive: true });
     return { code: 0, output: '' };
   } };
   const request: CompatibilityPackRequest = { storeId: HALO_STORE_ID, engine: 'crossover-preview', installation: { root: cxRoot, wine: path.join(cxRoot, 'bin/wine'), wineserver: path.join(cxRoot, 'bin/wineserver'), cxbottle: path.join(cxRoot, 'bin/cxbottle'), version: '20261015' }, dataRoot: data, log: () => {} };
-  return { root, app, cxRoot, assets, data, calls, deps, request };
+  return { root, app, cxRoot, catalogRoot, assets, data, calls, deps, request };
 }
 
 async function setupPipeline(f: Awaited<ReturnType<typeof fixture>>, pack: NonNullable<Awaited<ReturnType<typeof prepareGameCompatibilityPack>>>, setup: MacRunnerDeps['prepareCrossOver']) {
@@ -46,8 +54,8 @@ async function setupPipeline(f: Awaited<ReturnType<typeof fixture>>, pack: NonNu
 }
 
 describe('game compatibility packs', () => {
-  it('does not inspect packs or touch engines for other games, stable CrossOver or FEX', async () => {
-    const f = await fixture(); f.deps.assetRoot = '/does-not-exist';
+  it('does not inspect unrelated manifests or touch engines for other games, stable CrossOver or FEX', async () => {
+    const f = await fixture(); await fs.writeFile(path.join(f.assets, 'manifest.json'), 'broken unrelated manifest');
     for (const changed of [{ storeId: 'another-game' }, { engine: 'crossover' }, { engine: 'crossover-preview-fex' }, { storeId: undefined }]) {
       expect(await prepareGameCompatibilityPack({ ...f.request, ...changed }, f.deps)).toBeUndefined();
     }
@@ -226,6 +234,85 @@ describe('game compatibility packs', () => {
     await fs.chmod(file, 0o644); await fs.unlink(file); await fs.symlink(path.join(f.root, 'untouched'), file);
     await expect(pack.configurePrefix(prefix)).rejects.toThrow('Engine.ini');
     await expect(fs.stat(path.join(f.root, 'untouched'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+});
+
+describe('catalog-driven game isolation', () => {
+  async function addSecond(f: Awaited<ReturnType<typeof fixture>>) {
+    const manifest = JSON.parse(await fs.readFile(path.join(f.assets, 'manifest.json'), 'utf8'));
+    Object.assign(manifest, { id: 'synthetic-second-v1', storeId: '222222222222', name: 'Synthetic second game', appName: 'MACxus Second Game.app', engineDirectory: 'verified-engine-v1',
+      dlls: { 'other.dll': hash('patched-other') }, originalDLLs: { 'other.dll': hash('original-other') }, buildTimestamps: { 'other.dll': 42 },
+      environment: { MACXUS_SECOND_GAME: '1' }, configuration: [{ kind: 'unreal-ini', project: 'DifferentProject', platform: 'Windows', file: 'Game.ini', section: 'GameSettings', values: { SecondGameOption: '42' }, readOnly: false }] });
+    const assets = path.join(f.catalogRoot, manifest.id);
+    await fs.mkdir(path.join(assets, 'payload'), { recursive: true });
+    await fs.writeFile(path.join(assets, 'manifest.json'), JSON.stringify(manifest));
+    await fs.writeFile(path.join(assets, 'payload/other.dll'), 'patched-other');
+    await fs.writeFile(path.join(f.cxRoot, 'lib/wine/x86_64-windows/other.dll'), 'original-other');
+    const catalog = JSON.parse(await fs.readFile(path.join(f.catalogRoot, 'catalog.json'), 'utf8'));
+    catalog.packs.push(Object.fromEntries(['id', 'storeId', 'engine', 'version', 'buildTag'].map(key => [key, manifest[key]])));
+    await fs.writeFile(path.join(f.catalogRoot, 'catalog.json'), JSON.stringify(catalog));
+    return { ...f.request, storeId: manifest.storeId };
+  }
+  it('routes two games to independent DLLs, bottles, environment and configuration without launch-code changes', async () => {
+    const f = await fixture(), secondRequest = await addSecond(f);
+    const [halo, second] = await Promise.all([prepareGameCompatibilityPack(f.request, f.deps), prepareGameCompatibilityPack(secondRequest, f.deps)]);
+    expect(halo!.bottlesRoot).not.toBe(second!.bottlesRoot);
+    expect(second!.installation.root).toContain('synthetic-second-v1/verified-engine-v1/MACxus Second Game.app');
+    expect(second!.environment).toEqual({ MACXUS_SECOND_GAME: '1' });
+    expect(halo!.environment).toEqual({ MACXUS_MF_SOFTWARE_OUTPUT: '1' });
+    for (const pack of [halo!, second!]) { await fs.mkdir(path.join(pack.bottlesRoot, 'xbox')); await pack.configurePrefix(path.join(pack.bottlesRoot, 'xbox')); }
+    const secondIni = path.join(second!.bottlesRoot, 'xbox/drive_c/users/crossover/AppData/Local/DifferentProject/Saved/Config/Windows/Game.ini');
+    expect(await fs.readFile(secondIni, 'utf8')).toContain('[GameSettings]\nSecondGameOption=42');
+    expect((await fs.stat(secondIni)).mode & 0o777).toBe(0o644);
+    await expect(fs.stat(path.join(second!.bottlesRoot, 'xbox/drive_c/users/crossover/AppData/Local/Meteorite'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await fs.readFile(path.join(second!.installation.root, 'lib/wine/x86_64-windows/other.dll'), 'utf8')).toBe('patched-other');
+    expect(await fs.readFile(path.join(halo!.installation.root, 'lib/wine/x86_64-windows/other.dll'), 'utf8')).toBe('original-other');
+    await expect(second!.configurePrefix(path.join(halo!.bottlesRoot, 'xbox'))).rejects.toThrow('dedicated bottle');
+    expect(await fs.readFile(path.join(f.cxRoot, 'lib/wine/x86_64-windows/other.dll'), 'utf8')).toBe('original-other');
+  });
+  it('does not read a broken unrelated manifest, but refuses a broken selected one before copying', async () => {
+    const f = await fixture(), secondRequest = await addSecond(f);
+    await fs.writeFile(path.join(f.catalogRoot, 'synthetic-second-v1/manifest.json'), '{bad');
+    await expect(prepareGameCompatibilityPack(secondRequest, f.deps)).rejects.toThrow();
+    expect(f.calls).toEqual([]);
+    expect(await prepareGameCompatibilityPack(f.request, f.deps)).toBeDefined();
+  });
+  it('also supports a registered stable CrossOver overlay, without applying the Preview pack', async () => {
+    const f = await fixture(), request = await addSecond(f);
+    const file = path.join(f.catalogRoot, 'synthetic-second-v1/manifest.json');
+    const manifest = JSON.parse(await fs.readFile(file, 'utf8')); manifest.engine = 'crossover';
+    await fs.writeFile(file, JSON.stringify(manifest));
+    const catalogFile = path.join(f.catalogRoot, 'catalog.json'), catalog = JSON.parse(await fs.readFile(catalogFile, 'utf8'));
+    catalog.packs[1].engine = 'crossover'; await fs.writeFile(catalogFile, JSON.stringify(catalog));
+    expect(await prepareGameCompatibilityPack(request, f.deps)).toBeUndefined();
+    const pack = await prepareGameCompatibilityPack({ ...request, engine: 'crossover' }, f.deps);
+    expect(pack!.environment).toEqual({ MACXUS_SECOND_GAME: '1' });
+    expect(await prepareGameCompatibilityPack({ ...f.request, engine: 'crossover' }, f.deps)).toBeUndefined();
+  });
+  it('rejects catalog ambiguity and selected manifest misrouting before executing commands', async () => {
+    const f = await fixture(), file = path.join(f.catalogRoot, 'catalog.json');
+    const catalog = JSON.parse(await fs.readFile(file, 'utf8'));
+    catalog.packs.push({ ...catalog.packs[0], id: 'ambiguous-v1' });
+    await fs.writeFile(file, JSON.stringify(catalog));
+    await expect(prepareGameCompatibilityPack(f.request, f.deps)).rejects.toThrow('ambiguous');
+    catalog.packs.pop(); await fs.writeFile(file, JSON.stringify(catalog));
+    const manifest = JSON.parse(await fs.readFile(path.join(f.assets, 'manifest.json'), 'utf8')); manifest.storeId = '333333333333';
+    await fs.writeFile(path.join(f.assets, 'manifest.json'), JSON.stringify(manifest));
+    await expect(prepareGameCompatibilityPack(f.request, f.deps)).rejects.toThrow('manifest/catalog mismatch');
+    expect(f.calls).toEqual([]);
+  });
+  it('validates a second game configuration destination before setup and refuses hard-linked INI files', async () => {
+    const f = await fixture(), secondRequest = await addSecond(f), pack = (await prepareGameCompatibilityPack(secondRequest, f.deps))!;
+    const prefix = path.join(pack.bottlesRoot, 'xbox'), local = path.join(prefix, 'drive_c/users/crossover/AppData/Local');
+    const outside = path.join(f.root, 'other-config'); await fs.mkdir(outside);
+    await fs.mkdir(local, { recursive: true }); await fs.symlink(outside, path.join(local, 'DifferentProject'));
+    await expect(pack.validatePrefix(prefix)).rejects.toThrow('symlinks');
+    await fs.unlink(path.join(local, 'DifferentProject'));
+    const config = path.join(local, 'DifferentProject/Saved/Config/Windows'); await fs.mkdir(config, { recursive: true });
+    const external = path.join(outside, 'Game.ini'); await fs.writeFile(external, 'Keep=1');
+    await fs.link(external, path.join(config, 'Game.ini'));
+    await expect(pack.configurePrefix(prefix)).rejects.toThrow('links');
+    expect(await fs.readFile(external, 'utf8')).toBe('Keep=1'); expect((await fs.stat(external)).mode & 0o777).toBe(0o644);
   });
 });
 

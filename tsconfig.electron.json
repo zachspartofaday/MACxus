@@ -9,8 +9,9 @@
     "outDir": "dist-electron",
     "rootDir": "src",
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node"],
+    "allowJs": true
   },
-  "include": ["src/main/**/*.ts", "src/preload/**/*.cts", "src/shared/**/*.ts"],
+  "include": ["src/main/**/*.ts", "src/preload/**/*.cts", "src/shared/**/*.ts", "src/shared/compatibility-pack-schema.mjs"],
   "exclude": ["**/*.test.ts"]
 }

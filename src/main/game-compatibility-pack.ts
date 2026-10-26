@@ -5,16 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { MAC_RUNTIME_DLLS, type CrossOverInstall } from './crossover.js';
 import { run, type RunResult } from './process.js';
 
-export const HALO_STORE_ID = '9N683TDT5M7R';
-const PACK_ID = 'halo-preview-media-v1';
-const DLLS = ['mfplat.dll', 'winegstreamer.dll'] as const;
-const ASSET_ROOT = fileURLToPath(new URL(`../../assets/compatibility-packs/${PACK_ID}/`, import.meta.url));
+import { parseCompatibilityCatalog, parseCompatibilityManifest, configurationPath, type CompatibilityManifest as Manifest } from '../shared/compatibility-pack-schema.mjs';
+
+const ASSET_ROOT = fileURLToPath(new URL('../../assets/compatibility-packs/', import.meta.url));
 const pending = new Map<string, Promise<CrossOverInstall>>();
 
-interface Manifest {
-  id: string; storeId: string; engine: string; version: string; buildTag: string;
-  unixSHA256: string; originalDLLs: Record<string, string>; dlls: Record<string, string>;
-}
 export interface CompatibilityPackRequest {
   storeId?: string; engine: string; installation: CrossOverInstall; dataRoot: string;
   log: (line: string) => void;
@@ -61,7 +56,7 @@ async function verifiedFile(file: string, expected: string): Promise<Buffer> {
 }
 async function command(deps: CompatibilityPackDeps, name: string, args: string[]): Promise<void> {
   const result = await deps.execute(name, args);
-  if (result.code !== 0) throw Error(`Halo compatibility engine preparation failed (${path.basename(name)}): ${result.output.trim().slice(-500)}`);
+  if (result.code !== 0) throw Error(`Game compatibility engine preparation failed (${path.basename(name)}): ${result.output.trim().slice(-500)}`);
 }
 function engineAt(installation: CrossOverInstall, app: string): CrossOverInstall {
   const root = path.join(app, 'Contents/SharedSupport/CrossOver');
@@ -73,12 +68,12 @@ async function validateEngine(app: string, manifest: Manifest, deps: Compatibili
   await plainDirectories(app, 'Contents', 'SharedSupport', 'CrossOver', 'lib', 'wine', 'x86_64-windows');
   await plainDirectories(app, 'Contents', 'SharedSupport', 'CrossOver', 'lib', 'wine', 'x86_64-unix');
   const wine = path.join(app, 'Contents/SharedSupport/CrossOver/lib/wine');
-  for (const name of DLLS) await verifiedFile(path.join(wine, 'x86_64-windows', name), manifest.dlls[name]);
-  await verifiedFile(path.join(wine, 'x86_64-unix/winegstreamer.so'), manifest.unixSHA256);
+  for (const name of Object.keys(manifest.dlls)) await verifiedFile(path.join(wine, 'x86_64-windows', name), manifest.dlls[name]);
+  for (const [name, expected] of Object.entries(manifest.unixLibraries)) await verifiedFile(path.join(wine, 'x86_64-unix', name), expected);
   await command(deps, '/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
 }
 async function prepareEngine(request: CompatibilityPackRequest, manifest: Manifest, payload: Map<string, Buffer>, root: string, deps: CompatibilityPackDeps): Promise<CrossOverInstall> {
-  const app = path.join(root, 'MACxus Halo Video.app');
+  const app = path.join(root, manifest.appName);
   let exists = true;
   try {
     await fs.lstat(app);
@@ -88,21 +83,21 @@ async function prepareEngine(request: CompatibilityPackRequest, manifest: Manife
     await validateEngine(app, manifest, deps);
     return engineAt(request.installation, app);
   }
-  request.log('Preparing the Halo movie compatibility engine…');
+  request.log(`Preparing ${manifest.name} engine…`);
   const original = path.resolve(request.installation.root, '../../..');
-  if (!original.endsWith('.app')) throw Error('Halo compatibility requires a CrossOver application bundle.');
+  if (!original.endsWith('.app')) throw Error('Game compatibility requires a CrossOver application bundle.');
   await plainDirectories(original);
   // The installed copy may have harmless Finder metadata. Its code is checked
   // here; the metadata-free copy must also pass the original vendor resource
   // seal below, before any component is changed or a new seal is created.
   await command(deps, '/usr/bin/codesign', ['--verify', '--deep', '--ignore-resources', original]);
   const staging = await fs.mkdtemp(path.join(root, '.prepare-'));
-  const staged = path.join(staging, 'MACxus Halo Video.app');
+  const staged = path.join(staging, manifest.appName);
   try {
     await command(deps, '/usr/bin/ditto', ['--noqtn', '--noextattr', '--norsrc', original, staged]);
     await plainDirectories(staged, 'Contents', 'SharedSupport', 'CrossOver', 'lib', 'wine', 'x86_64-windows');
     await command(deps, '/usr/bin/codesign', ['--verify', '--deep', '--strict', staged]);
-    for (const name of DLLS) {
+    for (const name of Object.keys(manifest.dlls)) {
       const target = path.join(staged, 'Contents/SharedSupport/CrossOver/lib/wine/x86_64-windows', name);
       const stat = await fs.lstat(target);
       if (!stat.isFile() || stat.isSymbolicLink()) throw Error('Unexpected compatibility DLL destination.');
@@ -116,7 +111,7 @@ async function prepareEngine(request: CompatibilityPackRequest, manifest: Manife
     if (!plistStat.isFile() || plistStat.isSymbolicLink()) throw Error('Invalid compatibility engine property list.');
     await fs.unlink(plist);
     await fs.writeFile(plist, plistBytes, { flag: 'wx', mode: 0o644 });
-    for (const [key, value] of [['CFBundleIdentifier', `io.macxus.compat.${PACK_ID}`], ['CFBundleName', 'MACxus Halo Video']]) {
+    for (const [key, value] of [['CFBundleIdentifier', `io.macxus.compat.${manifest.id}`], ['CFBundleName', manifest.appName.slice(0, -4)]]) {
       await command(deps, '/usr/libexec/PlistBuddy', ['-c', `Set :${key} ${value}`, plist]);
     }
     await command(deps, '/usr/bin/codesign', ['--force', '--sign', '-', '--timestamp=none', staged]);
@@ -126,43 +121,44 @@ async function prepareEngine(request: CompatibilityPackRequest, manifest: Manife
   } finally { await fs.rm(staging, { recursive: true, force: true }); }
 }
 
-/** Source-engine and payload hashes are checked before copying or executing.
- * This pack is selected only for Halo + the exact tested Preview Rosetta build. */
+/** Only the selected Store ID and exact Rosetta build may activate an overlay.
+ * Unrelated manifests are never loaded; corrupt selected metadata fails closed. */
 export async function prepareGameCompatibilityPack(request: CompatibilityPackRequest, deps: CompatibilityPackDeps = defaultDeps): Promise<CompatibilityPack | undefined> {
-  if (request.storeId?.toUpperCase() !== HALO_STORE_ID || request.engine !== 'crossover-preview') return undefined;
-  const manifest = JSON.parse(await fs.readFile(path.join(deps.assetRoot, 'manifest.json'), 'utf8')) as Manifest;
-  if (manifest.id !== PACK_ID || manifest.storeId !== HALO_STORE_ID || manifest.engine !== 'crossover-preview'
-      || !/^[\w.-]+$/.test(manifest.buildTag) || !/^[a-f0-9]{64}$/.test(manifest.unixSHA256)
-      || DLLS.some(name => !/^[a-f0-9]{64}$/.test(manifest.dlls?.[name]) || !/^[a-f0-9]{64}$/.test(manifest.originalDLLs?.[name]))) {
-    throw Error('Invalid Halo compatibility pack manifest.');
+  if (!request.storeId || !['crossover', 'crossover-preview'].includes(request.engine) || request.installation.supportsArm64) return undefined;
+  const catalog = parseCompatibilityCatalog(JSON.parse(await fs.readFile(path.join(deps.assetRoot, 'catalog.json'), 'utf8')));
+  const routes = catalog.packs.filter(entry => entry.storeId === request.storeId!.toUpperCase() && entry.engine === request.engine);
+  const candidates = routes.filter(entry => entry.version === request.installation.version);
+  if (!candidates.length) {
+    if (routes.length) request.log('No compatibility pack matches this engine version; using the selected engine.');
+    return undefined;
   }
   const cx = request.installation;
-  if (cx.version !== manifest.version || cx.supportsArm64) {
-    request.log('Halo movie compatibility pack does not support this Preview version or architecture; using the selected engine.');
-    return undefined;
-  }
   const config = await fs.readFile(path.join(cx.root, 'etc/CrossOver.conf'), 'utf8');
-  if (!config.split(/\r?\n/).some(line => line.trim() === `"BuildTag" = "${manifest.buildTag}"`)) {
-    request.log('Halo movie compatibility pack does not match this Preview build; using the selected engine.');
+  const matching = candidates.filter(entry => config.split(/\r?\n/).some(line => line.trim() === `"BuildTag" = "${entry.buildTag}"`));
+  if (!matching.length) {
+    request.log('No compatibility pack matches this engine build; using the selected engine.');
     return undefined;
   }
-  for (const name of DLLS) await verifiedFile(path.join(cx.root, 'lib/wine/x86_64-windows', name), manifest.originalDLLs[name]);
-  await verifiedFile(path.join(cx.root, 'lib/wine/x86_64-unix/winegstreamer.so'), manifest.unixSHA256);
+  if (matching.length !== 1) throw Error('Ambiguous compatibility pack engine build.');
+  const entry = matching[0], assetRoot = path.join(deps.assetRoot, entry.id);
+  const manifest = parseCompatibilityManifest(JSON.parse(await fs.readFile(path.join(assetRoot, 'manifest.json'), 'utf8')), entry);
+  for (const name of Object.keys(manifest.dlls)) await verifiedFile(path.join(cx.root, 'lib/wine/x86_64-windows', name), manifest.originalDLLs[name]);
+  for (const [name, expected] of Object.entries(manifest.unixLibraries)) await verifiedFile(path.join(cx.root, 'lib/wine/x86_64-unix', name), expected);
   const payload = new Map<string, Buffer>();
-  for (const name of DLLS) {
-    try { payload.set(name, await verifiedFile(path.join(deps.assetRoot, 'payload', name), manifest.dlls[name])); }
+  for (const name of Object.keys(manifest.dlls)) {
+    try { payload.set(name, await verifiedFile(path.join(assetRoot, 'payload', name), manifest.dlls[name])); }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      request.log('Halo movie compatibility pack payload is unavailable in this build; using the selected engine.');
+      request.log(`${manifest.name} payload is unavailable in this build; using the selected engine.`);
       return undefined;
     }
   }
   await fs.mkdir(request.dataRoot, { recursive: true });
   const managed = await directory(request.dataRoot, 'compatibility-packs');
-  const root = await directory(managed, PACK_ID);
+  const root = await directory(managed, manifest.id);
   // Copies sealed by the older implementation did not prove the vendor's
   // resource integrity. Ignore those copies, retaining the same game bottle.
-  const engineRoot = await directory(root, 'verified-engine-v2');
+  const engineRoot = await directory(root, manifest.engineDirectory);
   const key = path.resolve(engineRoot);
   let installation = pending.get(key);
   if (!installation) {
@@ -173,36 +169,36 @@ export async function prepareGameCompatibilityPack(request: CompatibilityPackReq
   try { prepared = await installation; } finally { if (pending.get(key) === installation) pending.delete(key); }
   const bottlesRoot = await directory(root, 'bottles');
   const validatePrefix = async (prefix: string) => {
-    if (path.resolve(prefix) !== path.join(bottlesRoot, 'xbox')) throw Error('Halo compatibility settings require the dedicated bottle.');
-    await plainDirectories(request.dataRoot, 'compatibility-packs', PACK_ID, 'bottles');
-    await validateCompatibilityPrefix(prefix, bottlesRoot);
+    if (path.resolve(prefix) !== path.join(bottlesRoot, 'xbox')) throw Error('Game compatibility settings require the dedicated bottle.');
+    await plainDirectories(request.dataRoot, 'compatibility-packs', manifest.id, 'bottles');
+    await validateCompatibilityPrefix(prefix, bottlesRoot, manifest);
   };
-  request.log('Halo movie compatibility pack enabled for this game only.');
+  request.log(`${manifest.name} pack enabled for this game only.`);
   return {
-    installation: prepared, bottlesRoot, environment: { MACXUS_MF_SOFTWARE_OUTPUT: '1' }, validatePrefix,
+    installation: prepared, bottlesRoot, environment: { ...manifest.environment }, validatePrefix,
     configurePrefix: async prefix => {
       await validatePrefix(prefix);
       const stat = await fs.lstat(prefix);
-      if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('Invalid Halo compatibility bottle.');
-      for (const configuration of ['Windows', 'WinGDK']) {
-        const dir = await directory(prefix, 'drive_c', 'users', 'crossover', 'AppData', 'Local', 'Meteorite', 'Saved', 'Config', configuration);
-        const ini = path.join(dir, 'Engine.ini');
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('Invalid game compatibility bottle.');
+      for (const action of manifest.configuration) {
+        const dir = await directory(prefix, ...configurationPath(action).split('/'));
+        const ini = path.join(dir, action.file);
         let before = '';
         try {
           const stat = await fs.lstat(ini);
-          if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024 * 1024) throw Error('Invalid Halo Engine.ini.');
+          if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 1024 * 1024) throw Error(`Invalid compatibility ${action.file}.`);
           before = await fs.readFile(ini, 'utf8');
         } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-        const after = haloMovieSettings(before);
+        const after = updateIniSettings(before, action.section, action.values);
         if (after !== before) {
-          const temp = await fs.mkdtemp(path.join(dir, '.halo-ini-'));
+          const temp = await fs.mkdtemp(path.join(dir, '.compat-ini-'));
           try {
-            const file = path.join(temp, 'Engine.ini');
-            await fs.writeFile(file, after, { flag: 'wx', mode: 0o444 });
+            const file = path.join(temp, action.file);
+            await fs.writeFile(file, after, { flag: 'wx', mode: action.readOnly ? 0o444 : 0o644 });
             await fs.rename(file, ini);
           } finally { await fs.rm(temp, { recursive: true, force: true }); }
         }
-        await fs.chmod(ini, 0o444);
+        await fs.chmod(ini, action.readOnly ? 0o444 : 0o644);
       }
     },
   };
@@ -212,7 +208,7 @@ export async function prepareGameCompatibilityPack(request: CompatibilityPackReq
  * Missing paths are allowed for first boot; existing setup destinations must
  * stay inside this bottle. Normal Wine drive/user-document links are not
  * recursively traversed. This is not isolation from concurrent external edits. */
-async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string): Promise<void> {
+async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string, manifest: Manifest): Promise<void> {
   const directories = async (root: string, relative: string): Promise<boolean> => {
     let current = root;
     for (const part of ['', ...relative.split('/').filter(Boolean)]) {
@@ -220,14 +216,14 @@ async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string):
       let stat;
       try { stat = await fs.lstat(current); }
       catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
-      if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('Halo bottle setup directories must not be symlinks.');
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('Compatibility bottle setup directories must not be symlinks.');
     }
     return true;
   };
   const file = async (target: string) => {
     try {
       const stat = await fs.lstat(target);
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw Error('Halo bottle setup files must not be links.');
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw Error(`Compatibility bottle setup files must not be links: ${path.basename(target)}.`);
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   };
   await file(path.join(bottlesRoot, 'xodus-crossover-wine'));
@@ -239,9 +235,11 @@ async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string):
     if (!entry.isDirectory()) await file(path.join(prefix, entry.name));
   }
   for (const relative of ['dosdevices', 'drive_c/windows/system32', 'drive_c/windows/syswow64',
-    'drive_c/users/crossover/AppData/Local/Meteorite/Saved/Config/Windows',
-    'drive_c/users/crossover/AppData/Local/Meteorite/Saved/Config/WinGDK']) {
+    ...manifest.configuration.map(configurationPath)]) {
     await directories(prefix, relative);
+  }
+  for (const action of manifest.configuration) {
+    if (await directories(prefix, configurationPath(action))) await file(path.join(prefix, configurationPath(action), action.file));
   }
   if (await directories(prefix, 'drive_c/windows/system32')) {
     for (const name of MAC_RUNTIME_DLLS) {
@@ -254,23 +252,29 @@ async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string):
     try {
       const stat = await fs.lstat(drive);
       if (!stat.isSymbolicLink() || path.resolve(path.dirname(drive), await fs.readlink(drive)) !== path.join(prefix, 'drive_c')) {
-        throw Error('The Halo bottle C: drive must point to its own drive_c.');
+        throw Error('The compatibility bottle C: drive must point to its own drive_c.');
       }
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   }
 }
 
-export function haloMovieSettings(text: string): string {
-  const settings = ['Electra.Win.H264UseOldOutputPath=1', 'Electra.Win.H265UseOldOutputPath=1'];
-  const output: string[] = []; let system = false, found = false;
+/** Replace only the declared keys in the selected section, including duplicate
+ * sections. Other sections/settings survive, and repeated application is stable. */
+export function updateIniSettings(text: string, sectionName: string, values: Record<string, string>): string {
+  const settings = Object.entries(values).map(([key, value]) => `${key}=${value}`);
+  const keys = new Set(Object.keys(values).map(key => key.toLowerCase()));
+  const output: string[] = []; let selected = false, found = false;
   for (const line of text.split(/\r?\n/)) {
     const section = line.match(/^\s*\[([^\]]+)\]\s*$/);
     if (section) {
-      system = section[1].toLowerCase() === 'systemsettings';
+      selected = section[1].toLowerCase() === sectionName.toLowerCase();
       output.push(line);
-      if (system && !found) { output.push(...settings); found = true; }
-    } else if (!system || !/^\s*Electra\.Win\.H26[45]UseOldOutputPath\s*=/i.test(line)) output.push(line);
+      if (selected && !found) { output.push(...settings); found = true; }
+    } else {
+      const key = line.match(/^\s*([^=]+?)\s*=/)?.[1].toLowerCase();
+      if (!selected || !key || !keys.has(key)) output.push(line);
+    }
   }
-  if (!found) output.push('', '[SystemSettings]', ...settings);
+  if (!found) output.push('', `[${sectionName}]`, ...settings);
   return output.join('\n').replace(/\n*$/, '\n');
 }

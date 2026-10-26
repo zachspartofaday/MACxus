@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "id": "halo-preview-media-v1",
+      "storeId": "9N683TDT5M7R",
+      "engine": "crossover-preview",
+      "version": "20261015",
+      "buildTag": "cxpreview-20261015-rc1"
+    }
+  ]
+}
