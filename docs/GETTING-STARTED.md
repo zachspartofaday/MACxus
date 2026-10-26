@@ -51,6 +51,10 @@ for one. You need to own the game or have an appropriate PC Game Pass subscripti
 ### 4. Install a game
 
 Choose a game in **My Library** or **Store**, then choose the drive/folder for it.
+Library cards and game pages show Microsoft's download estimate where available.
+Before downloading, review the selected package's download and installed-size
+estimates in the confirmation dialog. **Not reported** means the Store did not
+provide that size; estimates can change with updates and selected content.
 APFS and Mac OS Extended drives work directly. For exFAT/FAT/NTFS drives, use
 **Create APFS image**. Wait for installation to finish, then press **Play**.
 Not every game works; kernel anti-cheat games are unsupported. See the README's
@@ -114,6 +118,11 @@ ne richiede una. Devi possedere il gioco o avere un abbonamento PC Game Pass ada
 ### 4. Installa un gioco
 
 Scegli un gioco da **La mia libreria** o **Negozio**, poi il disco e la cartella.
+Le schede della libreria e le pagine dei giochi mostrano la stima Microsoft del
+download, se disponibile. Prima di scaricare, controlla le stime del download e
+della dimensione installata nella conferma del pacchetto. **Non indicata** significa
+che lo Store non ha fornito quella dimensione; le stime possono cambiare con gli
+aggiornamenti e i contenuti selezionati.
 I dischi APFS e Mac OS esteso funzionano direttamente. Per exFAT/FAT/NTFS usa
 **Crea immagine APFS**. Attendi la fine dell'installazione e premi **Gioca**.
 Non tutti i giochi funzionano; gli anti-cheat a livello kernel non sono supportati.

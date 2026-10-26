@@ -14,3 +14,14 @@ it('shows verified package names, IDs, platform and disabled unsupported choices
   expect(html.match(/disabled=""/g)).toHaveLength(2); expect(html).not.toContain('checked=""');
   expect(html).toContain('Cancel'); expect(html).toContain('checks your license');
 });
+
+it('shows a ready package and its estimates before enabling explicit installation confirmation', () => {
+  const plan: InstallPlan = { schema: 1, rootProductId: '9AAAAAAAAAAA', market: 'US', status: 'ready', choices: [
+    { productId: '9AAAAAAAAAAA', contentId: '11111111-1111-4111-8111-111111111111', title: 'PC game', platform: 'Windows.Desktop', packageFormat: 'MSIXVC', kind: 'Game', supported: true, size: { downloadBytes: 1024 ** 3 } },
+  ] };
+  const html = renderToStaticMarkup(<PackageDialog plan={plan} choose={() => {}} />);
+  expect(html).toContain('checked=""'); expect(html).not.toContain('disabled=""');
+  expect(html).toContain('Download size'); expect(html).toContain('About 1.0 GiB');
+  expect(html).toContain('Installed size'); expect(html).toContain('Not reported');
+  expect(html).not.toContain('0.0 GiB'); expect(html).toContain('Microsoft Store estimates');
+});

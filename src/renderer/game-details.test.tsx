@@ -23,6 +23,22 @@ it('shows a not-installed game with its own status and action, without a Manage 
   expect(html).toContain('gd-ready not-installed'); expect(html).not.toContain('>Installed<');
   expect(html).toContain('>Install</button>'); expect(html).not.toContain('More game actions'); expect(html).toContain('About the game');
 });
+
+it('places public size estimates in stat segments after activity, outside the Install controls', () => {
+  const html = renderToStaticMarkup(<GameDetailsContent game={game} details={{ ...details, size: { downloadBytes: 1024 ** 3, installBytes: 2 * 1024 ** 3 } }} installPreview play={<button>Install</button>} back={() => {}} refresh={() => {}} />);
+  expect(html).toContain('About 1.0 GiB'); expect(html).toContain('About 2.0 GiB');
+  expect(html.indexOf('Download size')).toBeGreaterThan(html.indexOf('Last played'));
+  expect(html.match(/class="gd-stat gd-size-stat"/g)).toHaveLength(2);
+  expect(html).toContain('<div class="button-row gd-play-controls"><button>Install</button></div>');
+  expect(render({ status: 'unavailable' })).not.toContain('Download size');
+});
+
+it('shows separate bundle package estimates while browsing instead of inventing one combined size', () => {
+  const choices = [1, 2].map(n => ({ productId: `9AAAAAAAAAA${n}`, contentId: String(n), title: `Edition ${n}`, platform: 'Windows.Desktop', packageFormat: 'MSIXVC', kind: 'Game', supported: true, size: { downloadBytes: n * 1024 ** 3 } }));
+  const html = renderToStaticMarkup(<GameDetailsContent game={game} installPreview installPlan={{ schema: 1, rootProductId: '9AAAAAAAAAAA', market: 'US', status: 'choice', choices }} play={<button>Install</button>} back={() => {}} refresh={() => {}} />);
+  expect(html).toContain('Package sizes'); expect(html).toContain('Edition 1'); expect(html).toContain('Edition 2');
+  expect(html).toContain('About 1.0 GiB'); expect(html).toContain('About 2.0 GiB'); expect(html).not.toContain('3.0 GiB');
+});
 it('does not present missing screenshots or failed metadata as an installation blocker',()=>{
   const html=render({status:'unavailable'},{...details,screenshots:[],description:''});
   expect(html).toContain('No screenshots available'); expect(html).toContain('>Play</button>'); expect(html).not.toContain('Open screenshot');

@@ -1486,7 +1486,7 @@ function registerIpc(): void {
     const binary = requireBackend('streaming');
     if (!backend.current.capabilities.packageSelection) throw Error('Update the Xodus backend in Settings to choose installation packages.');
     const productId = safeProductId(raw), market = currentMarket();
-    const plan = await readInstallPlan(binary, productId, market);
+    const plan = await catalog.installPlanSizes(await readInstallPlan(binary, productId, market));
     if (binary !== backend.current.binaryPath || market !== currentMarket()) throw Error('Backend or Store market changed. Try again.');
     return plan;
   });

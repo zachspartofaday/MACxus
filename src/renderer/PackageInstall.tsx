@@ -2,6 +2,8 @@ import { useI18n } from './i18n';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { InstallPlan, InstallRequest } from '../shared/types';
 import { StoragePicker } from './StoragePicker';
+import { PackageSize } from './PackageSize';
+import { startConfirmedInstall } from './package-install-flow';
 
 type Install = (request: InstallRequest) => Promise<string | undefined>;
 const InstallContext = createContext<Install>(async () => { throw Error('Installation dialog is unavailable.'); });
@@ -9,7 +11,7 @@ export const usePackageInstall = () => useContext(InstallContext);
 
 export function PackageDialog({ plan, choose }: { plan: InstallPlan; choose: (id?: string) => void }) {
   const { t } = useI18n();
-  const [selected, setSelected] = useState('');
+  const [selected, setSelected] = useState(plan.status === 'ready' ? plan.choices.find(item => item.supported)?.contentId ?? '' : '');
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') choose(); };
     window.addEventListener('keydown', onKey);
@@ -21,8 +23,9 @@ export function PackageDialog({ plan, choose }: { plan: InstallPlan; choose: (id
       <p>{t("Choose the package you want to install from this Store offer. Xodus checks your license before downloading.")}</p>
       <div className="package-choices">{plan.choices.map(item => <label className={`package-choice${item.supported ? '' : ' unsupported'}`} key={`${item.productId}:${item.contentId}`}>
         <input type="radio" name="install-package" value={item.contentId} disabled={!item.supported} checked={selected === item.contentId} onChange={() => setSelected(item.contentId)} />
-        <span><strong>{item.title}</strong><small>{item.platform || t("Unknown platform")} · {item.packageFormat || t("Unknown format")}{item.kind === 'GameAddOn' ? t(" · Add-on") : ''}{!item.supported ? t(" · Unsupported") : ''}</small><small>{t("Store ID")}{' '}{item.productId}</small><small className="package-content-id">{t("Package")}{' '}{item.contentId}</small></span>
+        <span><strong>{item.title}</strong><PackageSize value={item.size} /><small>{item.platform || t("Unknown platform")} · {item.packageFormat || t("Unknown format")}{item.kind === 'GameAddOn' ? t(" · Add-on") : ''}{!item.supported ? t(" · Unsupported") : ''}</small><small>{t("Store ID")}{' '}{item.productId}</small><small className="package-content-id">{t("Package")}{' '}{item.contentId}</small></span>
       </label>)}</div>
+      <p className="fine-print">{t("Microsoft Store estimates. Actual sizes can change with updates and selected content.")}</p>
       <div className="dialog-actions"><button className="secondary" data-gamepad-cancel onClick={() => choose()}>{t("Cancel")}</button><button className="primary" disabled={!selected} onClick={() => choose(selected)}>{t("Install selected package")}</button></div>
     </section>
   </div>;
@@ -69,13 +72,10 @@ export function PackageInstallProvider({ children }: { children: ReactNode }) {
           request = { ...request, destination: root.replace(/\/+$/, '') + request.destination.slice(oldRoot.replace(/\/+$/, '').length) };
         }
       }
-      const result = await window.launcher.getInstallPlan(request.productId);
-      if (!mounted.current) return;
-      if (result.status === 'unavailable') throw Error(t("No supported Windows.Desktop MSIXVC package was found for this Store offer."));
-      const selected = result.status === 'ready' ? result.choices.find(item => item.supported)!.contentId
-        : await new Promise<string | undefined>(resolve => { pending.current = resolve; setPlan(result); });
-      if (!selected || !mounted.current) return;
-      return await window.launcher.startInstall({ ...request, selectedContentId: selected, selectionMarket: result.market });
+      // Even one verified package needs confirmation before downloading, so
+      // its published estimates (or unavailable sizes) can be reviewed first.
+      return await startConfirmedInstall(request, window.launcher,
+        result => new Promise<string | undefined>(resolve => { pending.current = resolve; setPlan(result); }), () => mounted.current, t);
     } finally { busy.current = false; }
   };
   return <InstallContext.Provider value={install}>{children}{plan ? <PackageDialog plan={plan} choose={choose} /> : null}{storage ? <StorageDialog installRoot={storage} choose={chooseStorage} /> : null}</InstallContext.Provider>;

@@ -2,9 +2,10 @@ import { translate, type Translator } from '../shared/i18n';
 import { useI18n } from './i18n';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock3, Gamepad2, Images, LoaderCircle, MoreHorizontal, RefreshCw, X } from 'lucide-react';
-import type { AppSnapshot, Game, GameActivity, GameStoreDetails } from '../shared/types';
+import type { AppSnapshot, Game, GameActivity, GameStoreDetails, InstallPlan } from '../shared/types';
 import './game-details.css';
 import { Achievements } from './Achievements';
+import { PackageSize } from './PackageSize';
 
 export function formatMinutes(minutes?: number, t: Translator = translate.bind(null, 'en')): string {
   if (minutes === undefined || !Number.isFinite(minutes) || minutes < 0) return t("Unavailable");
@@ -70,6 +71,7 @@ interface PageProps {
   notices?: ReactNode;
   technical?: ReactNode;
   achievements?: ReactNode;
+  installPreview?: boolean;
 }
 interface ContentProps extends PageProps {
   details?: GameStoreDetails;
@@ -77,11 +79,13 @@ interface ContentProps extends PageProps {
   metadataLoading?: boolean;
   activityLoading?: boolean;
   metadataError?: boolean;
+  installPlan?: InstallPlan;
+  installSizeLoading?: boolean;
   refresh: () => void;
 }
 
 /** Descriptive data never gates Play or changes package/licensing decisions. */
-export function GameDetailsContent({ game, back, play, manage, status, notices, technical, achievements, details, activity, metadataLoading, activityLoading, metadataError, refresh }: ContentProps) {
+export function GameDetailsContent({ game, back, play, manage, status, notices, technical, achievements, installPreview, installPlan, installSizeLoading, details, activity, metadataLoading, activityLoading, metadataError, refresh }: ContentProps) {
   const { t, language } = useI18n();
   const [gallery, setGallery] = useState<number>();
   const [expanded, setExpanded] = useState(false);
@@ -93,6 +97,7 @@ export function GameDetailsContent({ game, back, play, manage, status, notices, 
     if (restoreFocus) manageRef.current?.querySelector<HTMLElement>('summary')?.focus({ preventScroll: true });
   };
   const images = details?.screenshots ?? [];
+  const packages = installPlan?.choices.filter(choice => choice.supported) ?? [];
   const description = details?.description ?? '';
   const shortDescription = description.split(/\r?\n\s*\r?\n/)[0];
   const release = details?.releaseDate && Number.isFinite(Date.parse(details.releaseDate)) ? new Date(details.releaseDate).toLocaleDateString(language, { year: 'numeric', month: 'long', day: 'numeric' }) : undefined;
@@ -138,8 +143,10 @@ export function GameDetailsContent({ game, back, play, manage, status, notices, 
         <div className="button-row gd-play-controls">{play}</div>
         <div className="gd-stat"><Clock3 /><div><span>{t("Xbox time played")}{' '}<button className="gd-refresh" aria-label={t("Refresh Xbox activity")} disabled={activityLoading} onClick={refresh}>{activityLoading ? <LoaderCircle className="spin" /> : <RefreshCw />}</button></span><strong>{activityLoading && !activity ? t("Loading…") : formatMinutes(activity?.minutesPlayed, t)}</strong><small>{activityLoading ? t("Reading Xbox activity…") : activityNote(activity, t)}</small></div></div>
         <div className="gd-stat gd-last-played"><div><span>{t("Last played")}</span><strong>{activityLoading && !activity ? t("Loading…") : lastPlayed}</strong></div></div>
+        {installPreview && packages.length < 2 ? <PackageSize value={packages[0]?.size ?? details?.size} loading={metadataLoading || installSizeLoading} stats /> : null}
         {manage === undefined ? null : <details ref={manageRef} className="gd-actions" data-game-menu={manageOpen ? '' : undefined} onToggle={event => setManageOpen(event.currentTarget.open)}><summary aria-label={t("More game actions")}><MoreHorizontal /><span>{t("Manage")}</span></summary><div role="menu" aria-label={t("Manage game")} onClick={event => { if ((event.target as HTMLElement).closest('button:not(:disabled)')) closeManage(); }}>{manage}</div></details>}
       </section>
+      {installPreview && packages.length > 1 ? <section className="gd-package-sizes"><h2>{t("Package sizes")}</h2>{packages.map(choice => <div key={choice.contentId}><strong>{choice.title}</strong><PackageSize value={choice.size} /></div>)}<p className="fine-print">{t("Microsoft Store estimates. Actual sizes can change with updates and selected content.")}</p></section> : null}
       {notices}
       {achievements}
       <div className="gd-detail-columns">
@@ -162,16 +169,28 @@ export function GameDetails(props: PageProps & { data: AppSnapshot }) {
   const [metadataError, setMetadataError] = useState(false);
   const [activity, setActivity] = useState<GameActivity>();
   const [activityLoading, setActivityLoading] = useState(true);
+  const [installPlan, setInstallPlan] = useState<InstallPlan>();
+  const [installSizeLoading, setInstallSizeLoading] = useState(false);
   const request = useRef(0);
   useEffect(() => {
     let live = true; setDetails(undefined); setMetadataLoading(true); setMetadataError(false);
     window.launcher.getGameDetails(game.id).then(value => { if (live) setDetails(value); }).catch(() => { if (live) setMetadataError(true); }).finally(() => { if (live) setMetadataLoading(false); });
     return () => { live = false; };
   }, [game.id, data.settings.market]);
+  useEffect(() => {
+    let live = true; setInstallPlan(undefined); setInstallSizeLoading(false);
+    if (props.installPreview && data.backend.available && data.backend.capabilities.packageSelection) {
+      setInstallSizeLoading(true);
+      void window.launcher.getInstallPlan(game.storeId ?? game.id).then(value => { if (live) setInstallPlan(value); })
+        .catch(() => { /* Public metadata remains an optional estimate. */ })
+        .finally(() => { if (live) setInstallSizeLoading(false); });
+    }
+    return () => { live = false; };
+  }, [props.installPreview, game.id, game.storeId, data.settings.market, data.backend.available, data.backend.binaryPath, data.backend.capabilities.packageSelection]);
   const loadActivity = useCallback((refresh = false) => {
     const id = ++request.current; setActivityLoading(true);
     void window.launcher.getGameActivity(game.id, refresh).then(value => { if (request.current === id) setActivity(value); }).catch(() => { if (request.current === id) setActivity({ status: 'error' }); }).finally(() => { if (request.current === id) setActivityLoading(false); });
   }, [game.id, data.auth.username, data.auth.stored, data.auth.running, data.backend.binaryPath]);
   useEffect(() => { setActivity(undefined); loadActivity(); return () => { request.current++; }; }, [loadActivity]);
-  return <GameDetailsContent {...props} details={details} activity={activity} metadataLoading={metadataLoading} metadataError={metadataError} activityLoading={activityLoading} refresh={() => loadActivity(true)} achievements={<Achievements gameId={game.id} title={game.title} data={data} />} />;
+  return <GameDetailsContent {...props} details={details} activity={activity} metadataLoading={metadataLoading} metadataError={metadataError} installPlan={installPlan} installSizeLoading={installSizeLoading} activityLoading={activityLoading} refresh={() => loadActivity(true)} achievements={<Achievements gameId={game.id} title={game.title} data={data} />} />;
 }

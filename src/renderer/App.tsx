@@ -14,6 +14,7 @@ import { subscriptionBadge } from '../shared/subscription';
 import { defaultLaunchTools, normalizeLaunchTools } from '../shared/launch-tools';
 import type { GameLaunchTools } from '../shared/types';
 import { PackageInstallProvider, usePackageInstall } from './PackageInstall';
+import { PackageSize } from './PackageSize';
 import { defaultLibraryFilters, loadLibraryFilters, saveLibraryFilters, libraryProductMatchesPlayState, type LibraryFilters } from './library-preferences';
 import { InstallQueueShortcut } from './InstallQueueShortcut';
 import { GamepadNavigation } from './GamepadNavigation';
@@ -459,7 +460,7 @@ export function LibraryProductCard({ product, present, downloading, installing, 
   useBrowserLayoutEffect(() => {
     if (!disabled && document.activeElement === card.current) card.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
   }, [disabled]);
-  const main = <>{product.posterUrl ? <img src={product.posterUrl} alt={`${product.title} cover`} loading="lazy" /> : <div className="catalog-cover-placeholder"><Gamepad2 /></div>}<CatalogSupportBadge product={product} /><div><GameTitle title={product.title} /><small>{product.publisher ?? product.productId}</small><span>{product.access === 'owned' ? t("Owned") : 'Game Pass'}</span></div></>;
+  const main = <>{product.posterUrl ? <img src={product.posterUrl} alt={`${product.title} cover`} loading="lazy" /> : <div className="catalog-cover-placeholder"><Gamepad2 /></div>}<CatalogSupportBadge product={product} /><div><GameTitle title={product.title} /><small>{product.publisher ?? product.productId}</small><span>{product.access === 'owned' ? t("Owned") : 'Game Pass'}</span>{!present && product.installability === 'supported' ? <PackageSize value={product.size} compact /> : null}</div></>;
   // With a detail page the card itself is a button, so it never needs its own tab stop.
   const unavailable = disabled && !open;
   return <article ref={card} className="catalog-card" data-gamepad-card tabIndex={unavailable ? 0 : -1} aria-label={unavailable ? t("{value0}, {value1}. Action unavailable", { value0: product.title, value1: label }) : undefined}>
@@ -477,6 +478,7 @@ function LibraryProductDetails({ product, data, toast, back }: { product: Librar
   const game: Game = { id: product.productId, title: product.title, path: '', storeId: product.productId, publisher: product.publisher,
     coverUrl: product.posterUrl, heroUrl: product.heroUrl, installState: 'ready', addedAt: '' };
   return <GameDetails key={`${product.productId}:${data.auth.username}:${data.auth.stored}:${data.auth.running}:${data.backend.binaryPath}:${data.settings.market}`} game={game} data={data} back={back}
+    installPreview={!present}
     status={<span className="gd-ready not-installed">{present ? <Check /> : <Download />}{present ? t("Installed") : t("Not installed")}</span>}
     play={<button className="primary" data-gamepad-play disabled={disabled} onClick={() => { if (!disabled) void install(product); }}>{installing === product.productId ? <LoaderCircle className="spin" /> : present ? <Check /> : <Download />}{label}</button>}
     notices={product.installability !== 'supported' ? <div className="alert amber"><CircleAlert /><span>{product.supportNote}</span></div> : null}

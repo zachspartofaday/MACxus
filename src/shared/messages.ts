@@ -1,5 +1,12 @@
 // English source strings are the message keys. Keep placeholders identical in both languages.
 export const italianMessages = {
+  "Package sizes": "Dimensioni dei pacchetti",
+  "Choose a supported package from this Store offer before installing.": "Scegli un pacchetto supportato da questa offerta dello Store prima di installare.",
+  "Download size": "Dimensione del download",
+  "Installed size": "Dimensione installata",
+  "Not reported": "Non indicata",
+  "About {value0}": "Circa {value0}",
+  "Microsoft Store estimates. Actual sizes can change with updates and selected content.": "Stime di Microsoft Store. Le dimensioni effettive possono cambiare con gli aggiornamenti e i contenuti selezionati.",
   "Secret achievement": "Obiettivo segreto",
   "Reveal the details only if you want to see spoilers.": "Rivela i dettagli solo se vuoi vedere gli spoiler.",
   "Unlocked": "Sbloccato",

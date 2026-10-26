@@ -1,4 +1,5 @@
-import type { CatalogProduct, CatalogSearchResult, GameStoreDetails } from '../shared/types.js';
+import type { CatalogProduct, CatalogSearchResult, GameStoreDetails, InstallPlan, PackageSize } from '../shared/types.js';
+import { catalogPackageSizes, singleCatalogPackageSize } from './catalog-sizes.js';
 
 type Fetcher = typeof fetch;
 
@@ -46,6 +47,7 @@ interface PackageSupport {
   installProductId?: string;
   packageFormat?: string;
   supportNote: string;
+  size?: PackageSize;
 }
 
 interface BundleReference {
@@ -167,6 +169,7 @@ function directPackageSupport(product: Record<string, unknown> | undefined): Pac
   if (desktopFormats.has('MSIXVC')) return {
     installability: 'supported',
     packageFormat: 'MSIXVC',
+    size: singleCatalogPackageSize(product),
     supportNote: 'A direct Windows.Desktop MSIXVC package was verified. Ownership is checked by Xodus when installation starts.',
   };
   if (desktopFormats.size > 0) return {
@@ -279,14 +282,18 @@ export class CatalogService {
 
   constructor(private readonly fetcher: Fetcher = fetch) {}
 
-  /** Read descriptive data for an installed game, independently of package support. */
+  /** Read descriptive data and public size estimates, independently of ownership. */
   async gameDetails(productId: string, rawMarket: string): Promise<GameStoreDetails | undefined> {
     if (!/^[A-Z0-9]{12}$/.test(productId)) throw Error('Invalid Store product ID.');
     const market = normalizeMarket(rawMarket), key = `${market}:${productId}`;
     const cached = this.gameCache.get(key);
     if (cached && cached.until > Date.now()) return structuredClone(cached.value);
     const catalog = await this.details([productId], market);
-    const product = (Array.isArray(catalog.Products) ? catalog.Products : []).map(object).find(p => p?.ProductId === productId);
+    const products = new Map((Array.isArray(catalog.Products) ? catalog.Products : []).flatMap(entry => {
+      const record = object(entry), id = string(record?.ProductId)?.toUpperCase();
+      return record && id ? [[id, record] as const] : [];
+    }));
+    const product = products.get(productId);
     if (!product || product.ProductType !== 'Game') return;
     const localized = Array.isArray(product.LocalizedProperties) ? object(product.LocalizedProperties[0]) : undefined;
     const title = string(localized?.ProductTitle)?.slice(0, 512);
@@ -301,7 +308,8 @@ export class CatalogService {
     const titleId = string(alternateIds.find(id => id?.IdType === 'XboxTitleId')?.Value);
     const value: GameStoreDetails = { productId, title, description: (string(localized?.ProductDescription) ?? '').slice(0, 64_000),
       publisher: string(localized?.PublisherName)?.slice(0, 512), heroUrl: displayImage(images.filter(image => object(image)), HERO_PURPOSES), categories, screenshots,
-      releaseDate: string(marketProperties?.OriginalReleaseDate), titleId: titleId && /^[1-9]\d{0,9}$/.test(titleId) ? titleId : undefined };
+      releaseDate: string(marketProperties?.OriginalReleaseDate), titleId: titleId && /^[1-9]\d{0,9}$/.test(titleId) ? titleId : undefined,
+      size: packageSupport(productId, products).size };
     if (this.gameCache.size >= 100) this.gameCache.delete(this.gameCache.keys().next().value!);
     this.gameCache.set(key, { until: Date.now() + CACHE_TTL_MS, value });
     return structuredClone(value);
@@ -330,12 +338,29 @@ export class CatalogService {
     return parseCatalogProducts({ productsList: rows }, catalog);
   }
 
-  private async fetchDetails(batch: string[], market: string): Promise<Record<string, unknown>[]> {
+  /** Optional public estimates cannot change the backend's package or license decision. */
+  async installPlanSizes(plan: InstallPlan): Promise<InstallPlan> {
+    const ids = [...new Set(plan.choices.filter(choice => choice.supported).map(choice => choice.productId))];
+    const products = new Map<string, Map<string, PackageSize>>();
+    // Bound requests even for a large bundle. A failed lookup leaves unknown sizes.
+    const batches = Array.from({ length: Math.ceil(ids.length / 25) }, (_, index) => ids.slice(index * 25, (index + 1) * 25));
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(4, batches.length) }, async () => {
+      while (next < batches.length) {
+        const batch = await this.fetchDetails(batches[next++], plan.market, 5_000).catch(() => []);
+        for (const product of batch) products.set(String(product.ProductId).toUpperCase(), catalogPackageSizes(product));
+      }
+    }));
+    return { ...plan, choices: plan.choices.map(choice => ({ ...choice,
+      size: choice.supported ? products.get(choice.productId)?.get(choice.contentId) : undefined })) };
+  }
+
+  private async fetchDetails(batch: string[], market: string, timeout = 20_000): Promise<Record<string, unknown>[]> {
     const url = new URL('https://displaycatalog.mp.microsoft.com/v7.0/products');
     url.searchParams.set('bigIds', batch.join(','));
     url.searchParams.set('market', market);
     url.searchParams.set('languages', 'en-us,neutral');
-    const response = await this.fetcher(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) });
+    const response = await this.fetcher(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(timeout) });
     if (!response.ok) throw Error('Catalog request failed.');
     const catalog = await response.json() as DisplayCatalogResponse;
     if (!catalog || !Array.isArray(catalog.Products)) throw Error('Invalid catalog response.');
