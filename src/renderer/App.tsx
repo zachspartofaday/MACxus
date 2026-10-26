@@ -14,7 +14,7 @@ import { subscriptionBadge } from '../shared/subscription';
 import { defaultLaunchTools, normalizeLaunchTools } from '../shared/launch-tools';
 import type { GameLaunchTools } from '../shared/types';
 import { PackageInstallProvider, usePackageInstall } from './PackageInstall';
-import { PackageSize } from './PackageSize';
+import { PackageSizeInfo } from './PackageSize';
 import { defaultLibraryFilters, loadLibraryFilters, saveLibraryFilters, libraryProductMatchesPlayState, type LibraryFilters } from './library-preferences';
 import { InstallQueueShortcut } from './InstallQueueShortcut';
 import { GamepadNavigation } from './GamepadNavigation';
@@ -425,8 +425,9 @@ function libraryInstallAction(t: Translator, product: CatalogProduct, present: b
 
 function libraryProductPresence(data: AppSnapshot, product: CatalogProduct) {
   const ids = [product.productId, product.installProductId].filter(Boolean).map(id => id!.toUpperCase());
+  const installedGame = data.games.find(game => ids.includes(game.storeId?.toUpperCase() ?? ''));
   return {
-    present: data.games.some(game => ids.includes(game.storeId?.toUpperCase() ?? '')),
+    present: Boolean(installedGame), installedGame,
     downloading: data.downloads.some(task => ['running', 'queued', 'paused'].includes(task.status) && ids.includes(task.productId.toUpperCase())),
   };
 }
@@ -460,12 +461,12 @@ export function LibraryProductCard({ product, present, downloading, installing, 
   useBrowserLayoutEffect(() => {
     if (!disabled && document.activeElement === card.current) card.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
   }, [disabled]);
-  const main = <>{product.posterUrl ? <img src={product.posterUrl} alt={`${product.title} cover`} loading="lazy" /> : <div className="catalog-cover-placeholder"><Gamepad2 /></div>}<CatalogSupportBadge product={product} /><div><GameTitle title={product.title} /><small>{product.publisher ?? product.productId}</small><span>{product.access === 'owned' ? t("Owned") : 'Game Pass'}</span>{!present && product.installability === 'supported' ? <PackageSize value={product.size} compact /> : null}</div></>;
+  const main = <>{product.posterUrl ? <img src={product.posterUrl} alt={`${product.title} cover`} loading="lazy" /> : <div className="catalog-cover-placeholder"><Gamepad2 /></div>}<CatalogSupportBadge product={product} /><div><GameTitle title={product.title} /><small>{product.publisher ?? product.productId}</small><span>{product.access === 'owned' ? t("Owned") : 'Game Pass'}</span></div></>;
   // With a detail page the card itself is a button, so it never needs its own tab stop.
   const unavailable = disabled && !open;
   return <article ref={card} className="catalog-card" data-gamepad-card tabIndex={unavailable ? 0 : -1} aria-label={unavailable ? t("{value0}, {value1}. Action unavailable", { value0: product.title, value1: label }) : undefined}>
     {open ? <button className="library-card catalog-card-main" data-gamepad-detail-target={product.productId} onClick={() => open(product)}>{main}</button> : <div className="catalog-card-main">{main}</div>}
-    <button className="catalog-card-install" disabled={disabled} onClick={() => { if (!disabled) install(product); }}>{present ? <Check /> : <Download />}{label}</button>
+    <div className="catalog-card-actions"><button className="catalog-card-install" disabled={disabled} onClick={() => { if (!disabled) install(product); }}>{present ? <Check /> : <Download />}{label}</button><PackageSizeInfo title={product.title} value={product.size} /></div>
   </article>;
 }
 
@@ -473,9 +474,9 @@ export function LibraryProductCard({ product, present, downloading, installing, 
 function LibraryProductDetails({ product, data, toast, back }: { product: LibraryProduct; data: AppSnapshot; toast: (value: Toast) => void; back: () => void }) {
   const { t } = useI18n();
   const { installing, install } = useLibraryInstall(data, toast);
-  const { present, downloading } = libraryProductPresence(data, product);
+  const { present, downloading, installedGame } = libraryProductPresence(data, product);
   const { disabled, label } = libraryInstallAction(t, product, present, downloading, installing, data.backend.capabilities.streaming);
-  const game: Game = { id: product.productId, title: product.title, path: '', storeId: product.productId, publisher: product.publisher,
+  const game: Game = installedGame ?? { id: product.productId, title: product.title, path: '', storeId: product.productId, publisher: product.publisher,
     coverUrl: product.posterUrl, heroUrl: product.heroUrl, installState: 'ready', addedAt: '' };
   return <GameDetails key={`${product.productId}:${data.auth.username}:${data.auth.stored}:${data.auth.running}:${data.backend.binaryPath}:${data.settings.market}`} game={game} data={data} back={back}
     installPreview={!present}

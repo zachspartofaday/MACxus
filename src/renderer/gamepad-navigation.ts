@@ -72,6 +72,14 @@ export function navigationTarget<T>(from: Rect, targets: readonly { value: T; re
   return best;
 }
 
+/** X opens only the focused card's declared secondary control. Keep installed
+ * game menus first, and never activate a control behind a modal scope. */
+export function activateCardOptions(origin: HTMLElement | undefined, scope: Document | HTMLElement, enabled: (element: HTMLElement) => boolean): void {
+  const trigger = origin?.closest('.library-card-wrap')?.querySelector<HTMLElement>('[data-game-menu-trigger]')
+    ?? origin?.closest('[data-gamepad-card]')?.querySelector<HTMLElement>('[data-gamepad-card-options]');
+  if (trigger && scope.contains(trigger) && enabled(trigger)) trigger.click();
+}
+
 type Options = { mode: (active: boolean) => void; back: () => void; page: (delta: number) => void };
 const controls = 'button,a[href],input:not([type="hidden"]),select,textarea,summary,[tabindex]';
 
@@ -354,8 +362,7 @@ export function installGamepadNavigation(win: Window, options: Options): () => v
     else if (value === 'back') back();
     else if (value === 'options') {
       const origin = detailReturn && focused()?.closest('[data-gamepad-detail]')?.getAttribute('data-gamepad-detail') === detailReturn.id ? detailReturn.origin : focused();
-      const trigger = origin?.closest('.library-card-wrap')?.querySelector<HTMLElement>('[data-game-menu-trigger]');
-      if (trigger && enabled(trigger)) trigger.click();
+      activateCardOptions(origin, scope, enabled);
     } else if (scope instanceof HTMLElement && scope.hasAttribute('data-gamepad-gallery')) {
       // Shoulder buttons change only the active gallery, never the page behind it.
       const target = scope.querySelector<HTMLElement>(value === 'previous-page' ? '[data-gamepad-gallery-previous]' : '[data-gamepad-gallery-next]');

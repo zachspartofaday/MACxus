@@ -61,6 +61,7 @@ const api: LauncherApi = {
   removeGame: (id: string, mode: 'library' | 'delete-files') => ipcRenderer.invoke('remove-game', id, mode),
   getGameLaunchOptions: (id: string) => ipcRenderer.invoke('game-launch-options', id),
   getGameDetails: (id: string) => ipcRenderer.invoke('game-details', id),
+  getInstalledGameSize: (id: string) => ipcRenderer.invoke('game-installed-size', id),
   getGameActivity: (id: string, refresh?: boolean) => ipcRenderer.invoke('game-activity', id, refresh),
   getGameAchievements: (id: string, refresh?: boolean) => ipcRenderer.invoke('game-achievements', id, refresh),
   launchGame: (id: string) => ipcRenderer.invoke('launch-game', id),

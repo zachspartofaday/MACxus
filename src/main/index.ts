@@ -26,6 +26,7 @@ import { CatalogService } from './catalog.js';
 import { cloudSaveRuntime, selectedWinePath, startXodusService, storeContentRuntime, unbridgedCloudSaveRuntime, type XodusServiceSession } from './xodus-service.js';
 import { prepareMacLaunchOptions } from './mac-launch-options.js';
 import { GameLogReducer, gameLoggingEnvironment, gameWindowEnvironment } from './game-log.js';
+import { installedGameBytes } from './installed-size.js';
 import { downloadVerifiedVcRedist, installedVcRuntimeVersion, VC_REDIST_VERSION, versionAtLeast } from './vc-runtime.js';
 import { assertGameRemovalAvailable, validateGameDeleteTarget } from './game-removal.js';
 import { deleteGameDirectory } from './game-delete.js';
@@ -1377,6 +1378,7 @@ function registerDemoIpc(catalogMarket: () => string): void {
     return game?.storeId ? catalog.gameDetails(game.storeId, catalogMarket()) : undefined;
   });
   ipcMain.handle('game-activity', () => ({ status: 'unavailable' }));
+  ipcMain.handle('game-installed-size', () => undefined);
   ipcMain.handle('game-achievements', () => ({ status: 'unavailable' }));
   ipcMain.handle('launch-game', () => {});
   ipcMain.handle('create-game-shortcut', () => { throw new Error('Shortcuts are unavailable in demo mode.'); });
@@ -1634,6 +1636,14 @@ function registerIpc(): void {
     const activity = await gameActivities.get(title, refresh);
     if (authState.running || authState.stored !== true || account !== authState.username || binary !== backend.current.binaryPath) return { status: 'error' };
     return activity;
+  });
+  ipcMain.handle('game-installed-size', async (_event, id: string) => {
+    if (typeof id !== 'string') throw Error('Invalid game ID.');
+    const game = store.games.find(entry => entry.id === id);
+    if (!game) throw Error('Game not found.');
+    const directory = game.path;
+    const bytes = await installedGameBytes(directory);
+    return store.games.find(entry => entry.id === id)?.path === directory ? bytes : undefined;
   });
   ipcMain.handle('game-achievements', async (_event, id: string, refresh = false) => {
     if (typeof id !== 'string' || typeof refresh !== 'boolean') throw Error('Invalid achievements request.');

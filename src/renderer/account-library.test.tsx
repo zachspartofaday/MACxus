@@ -5,11 +5,17 @@ import { defaultLaunchTools } from '../shared/launch-tools';
 import { demoSnapshot } from '../shared/demo-data';
 import type { AccountLibraryPage } from '../shared/types';
 
-it('shows a PC package size estimate on an uninstalled library card', () => {
+it('offers size information beside Install without adding size text to the library card', () => {
   const product: AccountLibraryPage['products'][number] = { productId: '9AAAAAAAAAAA', title: 'A game', access: 'owned', description: '', categories: [], installability: 'supported', supportNote: '', size: { downloadBytes: 1024 ** 3 } };
   const html = renderToStaticMarkup(<LibraryProductCard product={product} present={false} downloading={false} canInstall install={() => {}} />);
-  expect(html).toContain('Download size'); expect(html).toContain('About 1.0 GiB');
-  expect(html).toContain('package-size compact');
+  expect(html).toContain('aria-label="Download and installed size for A game"');
+  expect(html).toContain('aria-haspopup="dialog"');
+  expect(html).toContain('aria-expanded="false"');
+  const info = html.match(/<button[^>]*class="package-size-info"[^>]*>/)?.[0];
+  expect(info).toContain('data-gamepad-card-options');
+  expect(html.indexOf('class="package-size-info"')).toBeGreaterThan(html.indexOf('class="catalog-card-install"'));
+  expect(html).not.toContain('About 1.0 GiB');
+  expect(html).not.toContain('package-size compact');
 });
 
 it.each(['supported', 'unsupported', 'unknown'] as const)('uses the Store %s badge in Owned without enabling unsupported installs', installability => {

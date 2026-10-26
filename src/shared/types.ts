@@ -458,6 +458,7 @@ export interface LauncherApi {
   removeGame(id: string, mode: 'library' | 'delete-files'): Promise<void>;
   getGameLaunchOptions(id: string): Promise<GameLaunchOptions>;
   getGameDetails(id: string): Promise<GameStoreDetails | undefined>;
+  getInstalledGameSize(id: string): Promise<number | undefined>;
   getGameActivity(id: string, refresh?: boolean): Promise<GameActivity>;
   getGameAchievements(id: string, refresh?: boolean): Promise<GameAchievements>;
   launchGame(id: string): Promise<void>;
