@@ -24,6 +24,7 @@ import { prepareMacRunner } from './mac-engine.js';
 import { macRuntimeAvailable, runtimeDllDirectory, serviceSocketPathFits, syncMacDualSenseCompatibility } from './mac-launch.js';
 import { CatalogService } from './catalog.js';
 import { cloudSaveRuntime, selectedWinePath, startXodusService, storeContentRuntime, unbridgedCloudSaveRuntime, type XodusServiceSession } from './xodus-service.js';
+import { crossOverDlssEnvironment } from './mac-dlss.js';
 import { GameLogReducer, gameLoggingEnvironment, gameWindowEnvironment } from './game-log.js';
 import { downloadVerifiedVcRedist, installedVcRuntimeVersion, VC_REDIST_VERSION, versionAtLeast } from './vc-runtime.js';
 import { assertGameRemovalAvailable, validateGameDeleteTarget } from './game-removal.js';
@@ -1066,6 +1067,12 @@ async function prepareGameLaunch(id: string): Promise<void> {
     }
     // Per-game macOS profile values (whitelisted) apply unless the user already set them.
     for (const [key, value] of Object.entries(macProfileEnv)) if (environment[key] === undefined) environment[key] = value;
+    if (isMac) {
+      Object.assign(environment, crossOverDlssEnvironment(environment, macEngine, game.launchTools?.dlss === true));
+      if (game.launchTools?.dlss) addGameLog(macEngine === 'highball'
+        ? 'DLSS launch tool applies to CrossOver; the current engine is Highball.'
+        : 'CrossOver DLSS support enabled for this game. Select DLSS in the game graphics settings when available.');
+    }
     if (isMac && protonRunner) await syncMacDualSenseCompatibility(wineCommand, gamePrefix, game.launchTools?.dualSenseCompatibility === true, environment, addGameLog);
     const contentRoots = await contentManager().roots(game).catch(error => {
       addGameLog(`Managed content discovery unavailable: ${(error as Error).message}`);

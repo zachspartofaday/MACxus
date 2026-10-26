@@ -29,3 +29,9 @@ it('validates persisted launch tool settings at the IPC boundary', () => {
   expect(() => normalizeLaunchTools({ ...defaultLaunchTools, gamescopeArgs:'-f --' })).toThrow();
   expect(normalizeLaunchTools({ ...defaultLaunchTools, launchOptions:' PROTON_ENABLE_WAYLAND=1 %command% ' }).launchOptions).toBe('PROTON_ENABLE_WAYLAND=1 %command%');
 });
+
+it('defaults DLSS off for older games and validates the per-game IPC value', () => {
+  expect(normalizeLaunchTools({ mangoHud: false, gamescope: false, gamescopeArgs: '', launchOptions: '' }).dlss).toBe(false);
+  expect(normalizeLaunchTools({ ...defaultLaunchTools, dlss: true }).dlss).toBe(true);
+  for (const dlss of ['yes', 1, null, {}]) expect(() => normalizeLaunchTools({ ...defaultLaunchTools, dlss })).toThrow('Invalid DLSS setting.');
+});
