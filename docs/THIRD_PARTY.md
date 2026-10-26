@@ -35,12 +35,27 @@ When the Highball engine is installed, MACxus downloads the GLib/GStreamer frame
 Sikarugir template release (<https://github.com/Sikarugir-App/Template>, `Template-1.0.11.tar.xz`,
 pinned SHA-256). They are not bundled.
 
-## winevideo patches
+## winevideo patches and Halo media pack — LGPL-2.1-or-later
 
-`assets/runtime-patches/highball-wine-mf-software-output.patch` contains patches 0004, 0005 and
-0007 from <https://github.com/Jfishin/winevideo>, which modify Wine (LGPL-2.1-or-later). The
-repository has no license file; DLLs built from it are not distributed until the author confirms
-the license.
+`assets/runtime-patches/highball-wine-mf-software-output.patch` combines patches
+0004, 0005 and 0007 from <https://github.com/Jfishin/winevideo>, modifying Wine.
+The author's [licensing documentation](https://github.com/Jfishin/winevideo/wiki/Building-and-Patch-Provenance#licensing-and-attribution)
+states that Wine-derived DLLs and source changes follow Wine's LGPL terms.
+[Patch attribution](https://github.com/Jfishin/winevideo/blob/523a3dd7d5af0a5feec34a7433180129bd9ece6a/build/patches/SOURCES.md)
+identifies these three changes as original work.
+
+`assets/runtime-patches/crossover-preview-halo-mf-software-output.patch` adapts
+that software-output approach with an explicit per-process opt-in and two Preview
+private-interface changes. macOS packaging builds the exact hash-locked PE DLLs
+and includes them with Wine's LGPL license, the complete original source archive,
+the corresponding source patch and build instructions. See
+[HALO-PREVIEW-MEDIA.md](HALO-PREVIEW-MEDIA.md) and
+`assets/compatibility-packs/halo-preview-media-v1/manifest.json`.
+
+The user supplies CrossOver. The launcher makes a private local copy; no
+CrossOver app bundle, proprietary game files, GStreamer or FFmpeg binaries are
+distributed by the Halo pack. Other existing runtime components retain their
+own source/license notices above.
 
 ## Bundled Xodus backend — GPL-3.0
 

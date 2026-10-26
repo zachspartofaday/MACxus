@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "status": "experimental-game-specific-pack",
+  "engine": {
+    "displayVersion": "20261015",
+    "internalVersion": "27.0.0.41073",
+    "buildTag": "cxpreview-20261015-rc1",
+    "architecture": "x86_64 Rosetta",
+    "originalDLLs": {
+      "mfplat.dll": "0a20d436ae6dca9d70484758e04bea84f52be31a6a3040403e588ecc0d67e61f",
+      "winegstreamer.dll": "d97c44a717c7d3dfdb547f202477c1d42c3d3670ae911df59cda70c7e8875b71"
+    }
+  },
+  "source": {
+    "url": "https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz",
+    "sha256": "ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872",
+    "wineSubdirectory": "sources/wine",
+    "exactPreviewSources": false
+  },
+  "patch": {
+    "path": "assets/runtime-patches/crossover-preview-halo-mf-software-output.patch",
+    "sha256": "70c577e663a05b83ba8167c8722fed25ebc7b37edfae185a885b1abb2e27690e",
+    "derivedFrom": [
+      "assets/runtime-patches/highball-wine-mf-software-output.patch",
+      "https://github.com/Jfishin/winevideo"
+    ],
+    "environmentOptIn": "MACXUS_MF_SOFTWARE_OUTPUT=1"
+  },
+  "sources": {
+    "dlls/mfplat/sample.c": {
+      "originalSHA256": "de0d1da0c9adf466f3cfa5c762450de8bf3a10c8cb104155055f1e808c1a7096",
+      "patchedSHA256": "c0979cf717a1dbe6a3dd8fc96e18d8653a54425dc5dcabf5bb2f4557101d22ca"
+    },
+    "dlls/winegstreamer/video_decoder.c": {
+      "originalSHA256": "014ce0fa37f455dcebea76fc94a213aa60e3e3f95ca15ad98826c51d5ef8c95f",
+      "patchedSHA256": "ab930f1d9db8224345f902cdc6bbf4f36dff89c92480eb90329998bd2243fc93"
+    },
+    "dlls/winegstreamer/unixlib.h": {
+      "originalSHA256": "1d9021968854276645840da428d9b2ba9207a186b07af320757dafd70d2b964d",
+      "patchedSHA256": "9f04dbe953ebc0e066a19ce828a3050298e68517b6d35bbac2cbfc88858ec115"
+    }
+  },
+  "testedDLLs": {
+    "mfplat.dll": "826ea432ce8b3d941cafc3f0d8266389c342988d439573f82d7ab2bbe9246328",
+    "winegstreamer.dll": "acc50f2fbc7c0f2a933e531f4ec4210eb26db3aa142d2a3203391a35dc3448f3"
+  },
+  "testResult": {
+    "game": "Halo: Campaign Evolved",
+    "storeId": "9N683TDT5M7R",
+    "engine": "CrossOver Preview Rosetta",
+    "graphics": "D3DMetal",
+    "startupMovies": "picture and audio confirmed by user",
+    "laterCinematics": "not verified",
+    "pacing": "user reports smoother playback with minimal logging",
+    "directH264Probe": {
+      "inputPackets": 90,
+      "outputFrames": 90,
+      "output2DBuffers": 90,
+      "errors": 0
+    },
+    "fileDecoderProbesPassed": 4,
+    "automaticPack": "startup movie picture/audio confirmed by user"
+  },
+  "distribution": {
+    "generatedBinariesCommitted": false,
+    "bundledByMacPackaging": true,
+    "automaticGameScopedPreparation": true,
+    "winevideoLicense": "LGPL per author documentation",
+    "licenseDocumentation": "https://github.com/Jfishin/winevideo/wiki/Building-and-Patch-Provenance#licensing-and-attribution"
+  }
+}

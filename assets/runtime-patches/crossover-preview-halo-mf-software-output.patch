@@ -1,0 +1,161 @@
+--- a/dlls/mfplat/sample.c
++++ b/dlls/mfplat/sample.c
+@@ -1414,6 +1414,13 @@
+     return hr;
+ }
+ 
++static BOOL software_video_output_requested(void)
++{
++    WCHAR value[2];
++    return GetEnvironmentVariableW(L"MACXUS_MF_SOFTWARE_OUTPUT", value, ARRAY_SIZE(value)) == 1
++            && value[0] == '1';
++}
++
+ static HRESULT sample_allocator_initialize(struct sample_allocator *allocator, unsigned int sample_count,
+         unsigned int max_sample_count, IMFAttributes *attributes, IMFMediaType *media_type)
+ {
+@@ -1490,6 +1497,28 @@
+ 
+     if (FAILED(hr = sample_allocator_get_surface_service(allocator, &service)))
+         return hr;
++
++    /* Some D3D11 backends (notably CrossOver's d3dmetal, which has no
++     * MTLPixelFormat for NV12) cannot create YUV textures: CreateTexture2D with
++     * an unsupported format yields an invalid Metal descriptor and aborts the
++     * whole process. Honor CheckFormatSupport and fall back to B8G8R8A8 so the
++     * texture is always creatable instead of crashing. */
++    if (software_video_output_requested() && service.d3d11_device
++            && allocator->frame_desc.dxgi_format != DXGI_FORMAT_B8G8R8A8_UNORM
++            && allocator->frame_desc.dxgi_format != DXGI_FORMAT_B8G8R8X8_UNORM)
++    {
++        UINT support = 0;
++        if (FAILED(ID3D11Device_CheckFormatSupport(service.d3d11_device,
++                allocator->frame_desc.dxgi_format, &support))
++                || !(support & D3D11_FORMAT_SUPPORT_TEXTURE2D))
++        {
++            WARN("D3D11 device cannot create %#x as a texture; falling back to B8G8R8A8_UNORM.\n",
++                    allocator->frame_desc.dxgi_format);
++            allocator->frame_desc.dxgi_format = DXGI_FORMAT_B8G8R8A8_UNORM;
++            if (!allocator->frame_desc.bindflags)
++                allocator->frame_desc.bindflags = D3D11_BIND_SHADER_RESOURCE;
++        }
++    }
+ 
+     sample_allocator_release_samples(allocator);
+ 
+--- a/dlls/winegstreamer/video_decoder.c
++++ b/dlls/winegstreamer/video_decoder.c
+@@ -106,6 +106,7 @@
+ 
+     IMFVideoSampleAllocatorEx *allocator;
+     BOOL allocator_initialized;
++    BOOL have_d3d_manager;
+     IMFTransform *copier;
+     IMFMediaBuffer *temp_buffer;
+ 
+@@ -592,6 +593,14 @@
+     return !strcmp( sysname, "Darwin" );
+ }
+ 
++/* Experimental per-process opt-in: leave other games on the vendor behavior. */
++static BOOL software_video_output(void)
++{
++    WCHAR value[2];
++    return is_macos() && GetEnvironmentVariableW(L"MACXUS_MF_SOFTWARE_OUTPUT", value, ARRAY_SIZE(value)) == 1
++            && value[0] == '1';
++}
++
+ static HRESULT WINAPI transform_GetOutputAvailableType(IMFTransform *iface, DWORD id,
+         DWORD index, IMFMediaType **type)
+ {
+@@ -605,8 +614,12 @@
+     if (index >= decoder->output_type_count)
+         return MF_E_NO_MORE_TYPES;
+ 
+-    /* CW HACK 26265 */
+-    if (is_macos() && IsEqualGUID(decoder->output_types[index], &MFVideoFormat_NV12))
++    /* CW HACK 26265, narrowed by winevideo: NV12 is only poisonous when the
++     * output is bound to a D3D device (no macOS backend can create NV12
++     * D3D11 textures). As a plain system-memory format it is fine, and UE
++     * Electra's software path requires it to be enumerable. */
++    if (is_macos() && (!software_video_output() || decoder->have_d3d_manager)
++            && IsEqualGUID(decoder->output_types[index], &MFVideoFormat_NV12))
+     {
+         WARN("Skipping NV12 output format\n");
+         index++;
+@@ -863,11 +876,21 @@
+     switch (message)
+     {
+     case MFT_MESSAGE_SET_D3D_MANAGER:
++        /* winevideo: no macOS backend can make NV12/D3D11 video textures, so
++         * D3D-bound output starves direct-IMFTransform consumers (UE Electra).
++         * Refuse the manager like a non-D3D-aware MFT would; callers then use
++         * their software path and upload CPU frames themselves. */
++        if (software_video_output() && param)
++        {
++            WARN("Refusing D3D device manager on macOS; forcing system-memory output.\n");
++            return E_NOTIMPL;
++        }
+         if (FAILED(hr = IMFVideoSampleAllocatorEx_SetDirectXManager(decoder->allocator, (IUnknown *)param)))
+             return hr;
+ 
+         uninit_allocator(decoder);
+-        if (param)
++        decoder->have_d3d_manager = !!param;
++        if (param || software_video_output())
+             decoder->output_info.dwFlags |= MFT_OUTPUT_STREAM_PROVIDES_SAMPLES;
+         else
+             decoder->output_info.dwFlags &= ~MFT_OUTPUT_STREAM_PROVIDES_SAMPLES;
+@@ -1672,12 +1695,23 @@
+         goto failed;
+     if (FAILED(hr = MFCreateAttributes(&decoder->attributes, 16)))
+         goto failed;
++    /* winevideo: on macOS, advertise no D3D awareness at all — D3D-bound
++     * output would need NV12 D3D11 textures no backend can create. Callers
++     * (UE Electra, SourceReader) then take their software/system-memory
++     * paths, which work. */
+     if (FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &MF_LOW_LATENCY, FALSE))
+-            || FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D_AWARE, TRUE))
+-            || FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, TRUE))
++            || FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D_AWARE, !software_video_output()))
++            || FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, !software_video_output()))
+             || FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes,
+                     &MFT_DECODER_EXPOSE_OUTPUT_TYPES_IN_NATIVE_ORDER, FALSE)))
+         goto failed;
++
++    /* winevideo: on macOS always provide output samples ourselves — the
++     * sample allocator's system-memory buffers implement IMF2DBuffer, which
++     * consumers like UE Electra require on video frames (a caller-provided
++     * plain memory buffer does not, so they reject every frame). */
++    if (software_video_output())
++        decoder->output_info.dwFlags |= MFT_OUTPUT_STREAM_PROVIDES_SAMPLES;
+ 
+     if (FAILED(hr = MFCreateAttributes(&decoder->output_attributes, 0)))
+         goto failed;
+@@ -1753,7 +1787,7 @@
+     decoder->input_info.dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER
+             | MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE;
+     decoder->input_info.cbSize = 0x1000;
+-    decoder->output_info.dwFlags = MFT_OUTPUT_STREAM_WHOLE_SAMPLES | MFT_OUTPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER
++    decoder->output_info.dwFlags |= MFT_OUTPUT_STREAM_WHOLE_SAMPLES | MFT_OUTPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER
+             | MFT_OUTPUT_STREAM_FIXED_SAMPLE_SIZE;
+     decoder->output_info.cbSize = 1920 * 1088 * 2;
+ 
+--- a/dlls/winegstreamer/unixlib.h
++++ b/dlls/winegstreamer/unixlib.h
+@@ -192,6 +192,7 @@
+     UINT32 flags;
+     UINT32 max_size;
+     UINT32 size;
++    INT32 stride; /* Preview ABI: per-sample row stride. */
+     UINT64 data; /* pointer to user memory */
+ };
+ 
+@@ -334,6 +335,7 @@
+ struct wg_transform_attrs
+ {
+     UINT32 output_plane_align;
++    INT32 output_plane_stride; /* Preview ABI: per-transform row stride. */
+     UINT32 input_queue_length;
+     BOOL allow_format_change;
+     BOOL low_latency;
