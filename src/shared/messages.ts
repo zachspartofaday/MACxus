@@ -212,6 +212,7 @@ export const italianMessages = {
   "Gamescope options": "Opzioni gamescope",
   "Only options. Nexus adds the game command. MangoHud with gamescope requires mangoapp.": "Solo opzioni. Nexus aggiunge il comando del gioco. MangoHud con gamescope richiede mangoapp.",
   "Launch options": "Opzioni di avvio",
+  "On macOS, use NAME=value before %command% and game arguments after it. Quotes are literal; shell expansion and custom wrappers are unsupported. Options apply to this game only; graphics support depends on the selected engine.": "Su macOS, usa NAME=value prima di %command% e gli argomenti del gioco dopo. Le virgolette raggruppano valori letterali; l’espansione della shell e i wrapper personalizzati non sono supportati. Le opzioni valgono solo per questo gioco; il supporto grafico dipende dal motore scelto.",
   "NAME=value and wrappers before %command%, game arguments after it. Quotes are supported, not shell expansion. Variables are passed to Wine; Proton-script-only options depend on runtime support.": "NAME=value e wrapper prima di %command%, argomenti del gioco dopo. Sono supportate le virgolette, non l’espansione della shell. Le variabili vengono passate a Wine; le opzioni riservate agli script Proton dipendono dal runtime.",
   "Tools must already be installed. Applies to this game and its shortcuts, not the launcher.": "Gli strumenti devono essere già installati. Si applica a questo gioco e ai suoi collegamenti, non al launcher.",
   "Game settings saved.": "Impostazioni del gioco salvate.",
