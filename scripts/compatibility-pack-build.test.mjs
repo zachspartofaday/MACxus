@@ -37,9 +37,11 @@ test('stripped PE __FILE__ strings and bytes reproduce across different absolute
       execFileSync(compiler, ['-g', '-O2', input, '-o', 'probe.exe'], { cwd: build, env, stdio: 'pipe' });
       execFileSync(strip, ['--strip-debug', 'probe.exe'], { cwd: build, env, stdio: 'pipe' });
       const bytes = await fs.readFile(path.join(build, 'probe.exe'));
-      // Some binutils builds stamp PE headers during strip. Mirror the real
-      // recipe's fixed epoch for both compile/link and strip, not linker alone.
-      assert.equal(bytes.readUInt32LE(bytes.readUInt32LE(0x3c) + 8), timestamp);
+      // Deterministic binutils may clear the timestamp to zero; other builds
+      // preserve the fixed epoch. Neither may inject the wall-clock time.
+      const embeddedTimestamp = bytes.readUInt32LE(bytes.readUInt32LE(0x3c) + 8);
+      assert.ok(embeddedTimestamp === 0 || embeddedTimestamp === timestamp,
+        `unexpected non-deterministic PE timestamp: ${embeddedTimestamp}`);
       assert.ok(bytes.includes(Buffer.from('../sources/wine/libs/strmbase/seeking.c: SourceSeeking.cs')));
       assert.ok(!bytes.includes(Buffer.from(root)));
       outputs.push(createHash('sha256').update(bytes).digest('hex'));
