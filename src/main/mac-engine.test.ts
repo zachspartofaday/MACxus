@@ -59,7 +59,7 @@ describe('prepareMacRunner', () => {
     options.prepareCompatibility = async request => {
       if (request.storeId !== '9N683TDT5M7R') return undefined;
       expect(request.installation).toBe(preview);
-      return { installation: packed, bottlesRoot: '/private-pack/bottles', environment: { MACXUS_MF_SOFTWARE_OUTPUT: '1' }, configurePrefix: async prefix => { configured.push(prefix); } };
+      return { installation: packed, bottlesRoot: '/private-pack/bottles', environment: { MACXUS_MF_SOFTWARE_OUTPUT: '1' }, validatePrefix: async () => {}, configurePrefix: async prefix => { configured.push(prefix); } };
     };
     options.prepareCrossOver = async (cx, bottles) => {
       selected.push([cx, bottles]); return { command: `${bottles}/runner`, compatibilityDataPath: `${bottles}/xbox` };

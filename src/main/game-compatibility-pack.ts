@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CrossOverInstall } from './crossover.js';
+import { MAC_RUNTIME_DLLS, type CrossOverInstall } from './crossover.js';
 import { run, type RunResult } from './process.js';
 
 export const HALO_STORE_ID = '9N683TDT5M7R';
@@ -23,6 +23,7 @@ export interface CompatibilityPack {
   installation: CrossOverInstall;
   bottlesRoot: string;
   environment: Record<string, string>;
+  validatePrefix: (prefix: string) => Promise<void>;
   configurePrefix: (prefix: string) => Promise<void>;
 }
 export interface CompatibilityPackDeps {
@@ -91,14 +92,16 @@ async function prepareEngine(request: CompatibilityPackRequest, manifest: Manife
   const original = path.resolve(request.installation.root, '../../..');
   if (!original.endsWith('.app')) throw Error('Halo compatibility requires a CrossOver application bundle.');
   await plainDirectories(original);
-  // Finder metadata in some vendor bundles prevents strict resource checks;
-  // verify their code, then strictly verify the freshly sealed private copy.
+  // The installed copy may have harmless Finder metadata. Its code is checked
+  // here; the metadata-free copy must also pass the original vendor resource
+  // seal below, before any component is changed or a new seal is created.
   await command(deps, '/usr/bin/codesign', ['--verify', '--deep', '--ignore-resources', original]);
   const staging = await fs.mkdtemp(path.join(root, '.prepare-'));
   const staged = path.join(staging, 'MACxus Halo Video.app');
   try {
     await command(deps, '/usr/bin/ditto', ['--noqtn', '--noextattr', '--norsrc', original, staged]);
     await plainDirectories(staged, 'Contents', 'SharedSupport', 'CrossOver', 'lib', 'wine', 'x86_64-windows');
+    await command(deps, '/usr/bin/codesign', ['--verify', '--deep', '--strict', staged]);
     for (const name of DLLS) {
       const target = path.join(staged, 'Contents/SharedSupport/CrossOver/lib/wine/x86_64-windows', name);
       const stat = await fs.lstat(target);
@@ -157,20 +160,28 @@ export async function prepareGameCompatibilityPack(request: CompatibilityPackReq
   await fs.mkdir(request.dataRoot, { recursive: true });
   const managed = await directory(request.dataRoot, 'compatibility-packs');
   const root = await directory(managed, PACK_ID);
-  const key = path.resolve(root);
+  // Copies sealed by the older implementation did not prove the vendor's
+  // resource integrity. Ignore those copies, retaining the same game bottle.
+  const engineRoot = await directory(root, 'verified-engine-v2');
+  const key = path.resolve(engineRoot);
   let installation = pending.get(key);
   if (!installation) {
-    installation = prepareEngine(request, manifest, payload, root, deps);
+    installation = prepareEngine(request, manifest, payload, engineRoot, deps);
     pending.set(key, installation);
   }
   let prepared: CrossOverInstall;
   try { prepared = await installation; } finally { if (pending.get(key) === installation) pending.delete(key); }
   const bottlesRoot = await directory(root, 'bottles');
+  const validatePrefix = async (prefix: string) => {
+    if (path.resolve(prefix) !== path.join(bottlesRoot, 'xbox')) throw Error('Halo compatibility settings require the dedicated bottle.');
+    await plainDirectories(request.dataRoot, 'compatibility-packs', PACK_ID, 'bottles');
+    await validateCompatibilityPrefix(prefix, bottlesRoot);
+  };
   request.log('Halo movie compatibility pack enabled for this game only.');
   return {
-    installation: prepared, bottlesRoot, environment: { MACXUS_MF_SOFTWARE_OUTPUT: '1' },
+    installation: prepared, bottlesRoot, environment: { MACXUS_MF_SOFTWARE_OUTPUT: '1' }, validatePrefix,
     configurePrefix: async prefix => {
-      if (path.resolve(prefix) !== path.join(bottlesRoot, 'xbox')) throw Error('Halo compatibility settings require the dedicated bottle.');
+      await validatePrefix(prefix);
       const stat = await fs.lstat(prefix);
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('Invalid Halo compatibility bottle.');
       for (const configuration of ['Windows', 'WinGDK']) {
@@ -195,6 +206,58 @@ export async function prepareGameCompatibilityPack(request: CompatibilityPackReq
       }
     },
   };
+}
+
+/** Read-only preflight before either Wine engine may create/update the bottle.
+ * Missing paths are allowed for first boot; existing setup destinations must
+ * stay inside this bottle. Normal Wine drive/user-document links are not
+ * recursively traversed. This is not isolation from concurrent external edits. */
+async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string): Promise<void> {
+  const directories = async (root: string, relative: string): Promise<boolean> => {
+    let current = root;
+    for (const part of ['', ...relative.split('/').filter(Boolean)]) {
+      current = path.join(current, part);
+      let stat;
+      try { stat = await fs.lstat(current); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('Halo bottle setup directories must not be symlinks.');
+    }
+    return true;
+  };
+  const file = async (target: string) => {
+    try {
+      const stat = await fs.lstat(target);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw Error('Halo bottle setup files must not be links.');
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  };
+  await file(path.join(bottlesRoot, 'xodus-crossover-wine'));
+  await file(path.join(bottlesRoot, `xodus-crossover-wine.tmp-${process.pid}`));
+  if (!await directories(prefix, '')) return;
+  // Registry, bottle configuration and Wine's temporary registry files live
+  // at the top level; linked hives could otherwise update another bottle.
+  for (const entry of await fs.readdir(prefix, { withFileTypes: true })) {
+    if (!entry.isDirectory()) await file(path.join(prefix, entry.name));
+  }
+  for (const relative of ['dosdevices', 'drive_c/windows/system32', 'drive_c/windows/syswow64',
+    'drive_c/users/crossover/AppData/Local/Meteorite/Saved/Config/Windows',
+    'drive_c/users/crossover/AppData/Local/Meteorite/Saved/Config/WinGDK']) {
+    await directories(prefix, relative);
+  }
+  if (await directories(prefix, 'drive_c/windows/system32')) {
+    for (const name of MAC_RUNTIME_DLLS) {
+      await file(path.join(prefix, 'drive_c/windows/system32', name));
+      await file(path.join(prefix, 'drive_c/windows/system32', `${name}.nexus-${process.pid}`));
+    }
+  }
+  if (await directories(prefix, 'dosdevices')) {
+    const drive = path.join(prefix, 'dosdevices/c:');
+    try {
+      const stat = await fs.lstat(drive);
+      if (!stat.isSymbolicLink() || path.resolve(path.dirname(drive), await fs.readlink(drive)) !== path.join(prefix, 'drive_c')) {
+        throw Error('The Halo bottle C: drive must point to its own drive_c.');
+      }
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  }
 }
 
 export function haloMovieSettings(text: string): string {

@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { HALO_STORE_ID, haloMovieSettings, prepareGameCompatibilityPack, type CompatibilityPackDeps, type CompatibilityPackRequest } from './game-compatibility-pack.js';
+import { prepareMacRunner, type MacRunnerDeps } from './mac-engine.js';
 
 const temporary: string[] = [];
 const hash = (data: string) => createHash('sha256').update(data).digest('hex');
@@ -33,6 +34,15 @@ async function fixture() {
   } };
   const request: CompatibilityPackRequest = { storeId: HALO_STORE_ID, engine: 'crossover-preview', installation: { root: cxRoot, wine: path.join(cxRoot, 'bin/wine'), wineserver: path.join(cxRoot, 'bin/wineserver'), cxbottle: path.join(cxRoot, 'bin/cxbottle'), version: '20261015' }, dataRoot: data, log: () => {} };
   return { root, app, cxRoot, assets, data, calls, deps, request };
+}
+
+async function setupPipeline(f: Awaited<ReturnType<typeof fixture>>, pack: NonNullable<Awaited<ReturnType<typeof prepareGameCompatibilityPack>>>, setup: MacRunnerDeps['prepareCrossOver']) {
+  return prepareMacRunner({ setting: 'crossover-preview', storeId: HALO_STORE_ID, dataRoot: f.data, runtimeDllDir: '/dlls', log: () => {} }, {
+    findCrossOver: async () => undefined, findCrossOverPreview: async () => f.request.installation,
+    highballInstalled: () => undefined, profiles: async () => ({}),
+    prepareHighball: async () => { throw Error('Unexpected engine'); },
+    prepareCompatibility: async () => pack, prepareCrossOver: setup,
+  });
 }
 
 describe('game compatibility packs', () => {
@@ -68,7 +78,7 @@ describe('game compatibility packs', () => {
     const f = await fixture();
     const [one, two] = await Promise.all([prepareGameCompatibilityPack(f.request, f.deps), prepareGameCompatibilityPack(f.request, f.deps)]);
     expect(one?.installation).toEqual(two?.installation); expect(one?.environment).toEqual({ MACXUS_MF_SOFTWARE_OUTPUT: '1' });
-    expect(one?.installation.wine).toContain('compatibility-packs/halo-preview-media-v1/MACxus Halo Video.app/');
+    expect(one?.installation.wine).toContain('compatibility-packs/halo-preview-media-v1/verified-engine-v2/MACxus Halo Video.app/');
     expect(one?.bottlesRoot).toContain('compatibility-packs/halo-preview-media-v1/bottles');
     expect(f.calls.filter(([name]) => name.endsWith('/ditto'))).toHaveLength(1);
     expect(await fs.readFile(path.join(f.cxRoot, 'lib/wine/x86_64-windows/mfplat.dll'), 'utf8')).toBe('original-mfplat.dll');
@@ -96,8 +106,90 @@ describe('game compatibility packs', () => {
     const f = await fixture(), execute = f.deps.execute;
     f.deps.execute = (command, args) => args.includes('--strict') ? Promise.resolve({ code: 1, output: 'signature failed' }) : execute(command, args);
     await expect(prepareGameCompatibilityPack(f.request, f.deps)).rejects.toThrow('signature failed');
-    expect(await fs.readdir(path.join(f.data, 'compatibility-packs/halo-preview-media-v1'))).toEqual([]);
+    expect(await fs.readdir(path.join(f.data, 'compatibility-packs/halo-preview-media-v1/verified-engine-v2'))).toEqual([]);
     expect(await fs.readFile(path.join(f.cxRoot, 'lib/wine/x86_64-windows/mfplat.dll'), 'utf8')).toBe('original-mfplat.dll');
+  });
+  it('checks the vendor resource seal before replacement or resealing can hide a modified resource', async () => {
+    const f = await fixture(), execute = f.deps.execute;
+    await fs.mkdir(path.join(f.app, 'Contents/Resources'));
+    await fs.writeFile(path.join(f.app, 'Contents/Resources/vendor.txt'), 'modified sealed resource');
+    let resealed = false;
+    f.deps.execute = async (command, args) => {
+      const result = await execute(command, args);
+      if (command.endsWith('/codesign') && args.includes('--force')) resealed = true;
+      if (command.endsWith('/codesign') && args.includes('--strict') && !resealed) {
+        // A strict check against the original signature rejects the resource.
+        // Re-signing first would accept it, reproducing the former bug.
+        expect(await fs.readFile(path.join(args.at(-1)!, 'Contents/SharedSupport/CrossOver/lib/wine/x86_64-windows/mfplat.dll'), 'utf8')).toBe('original-mfplat.dll');
+        return { code: 1, output: 'a sealed resource is missing or invalid' };
+      }
+      return result;
+    };
+    await expect(prepareGameCompatibilityPack(f.request, f.deps)).rejects.toThrow('sealed resource');
+    expect(resealed).toBe(false);
+    expect(f.calls.some(([name]) => name.endsWith('/PlistBuddy'))).toBe(false);
+    expect(await fs.readFile(path.join(f.cxRoot, 'lib/wine/x86_64-windows/mfplat.dll'), 'utf8')).toBe('original-mfplat.dll');
+  });
+  it('ignores engines created under the previous resource verification policy without removing their bottle', async () => {
+    const f = await fixture();
+    const legacy = path.join(f.data, 'compatibility-packs/halo-preview-media-v1/MACxus Halo Video.app');
+    await fs.mkdir(path.dirname(legacy), { recursive: true }); await fs.cp(f.app, legacy, { recursive: true });
+    for (const name of ['mfplat.dll', 'winegstreamer.dll']) await fs.writeFile(path.join(legacy, 'Contents/SharedSupport/CrossOver/lib/wine/x86_64-windows', name), `patched-${name}`);
+    const prefix = path.join(path.dirname(legacy), 'bottles/xbox'); await fs.mkdir(prefix, { recursive: true }); await fs.writeFile(path.join(prefix, 'keep.txt'), 'existing game data');
+    const pack = (await prepareGameCompatibilityPack(f.request, f.deps))!;
+    expect(pack.installation.root).toContain('verified-engine-v2');
+    expect(f.calls.filter(([name]) => name.endsWith('/ditto'))).toHaveLength(1);
+    expect(await fs.readFile(path.join(prefix, 'keep.txt'), 'utf8')).toBe('existing game data');
+    expect((await fs.stat(legacy)).isDirectory()).toBe(true);
+  });
+  it.each(['prefix', 'drive_c', 'windows', 'system32', 'user.reg', 'registry-hardlink', 'c-drive'])('rejects linked %s before either engine can write through it', async kind => {
+    const f = await fixture(), pack = (await prepareGameCompatibilityPack(f.request, f.deps))!;
+    const prefix = path.join(pack.bottlesRoot, 'xbox'), outside = path.join(f.root, 'another-bottle');
+    await fs.mkdir(path.join(outside, 'drive_c/windows/system32'), { recursive: true });
+    await fs.writeFile(path.join(outside, 'system.reg'), 'keep registry'); await fs.writeFile(path.join(outside, 'user.reg'), 'keep user registry');
+    await fs.writeFile(path.join(outside, 'drive_c/windows/system32/winhttp.dll'), 'keep DLL');
+    if (kind === 'prefix') await fs.symlink(outside, prefix);
+    else {
+      await fs.mkdir(path.join(prefix, 'drive_c/windows/system32'), { recursive: true });
+      if (['drive_c', 'windows', 'system32'].includes(kind)) {
+        const relative = kind === 'drive_c' ? 'drive_c' : kind === 'windows' ? 'drive_c/windows' : 'drive_c/windows/system32';
+        const target = path.join(prefix, relative); await fs.rm(target, { recursive: true }); await fs.symlink(path.join(outside, relative), target);
+      } else if (kind === 'user.reg') await fs.symlink(path.join(outside, 'user.reg'), path.join(prefix, 'user.reg'));
+      else if (kind === 'registry-hardlink') await fs.link(path.join(outside, 'user.reg'), path.join(prefix, 'user.reg'));
+      else { await fs.mkdir(path.join(prefix, 'dosdevices')); await fs.symlink(path.join(outside, 'drive_c'), path.join(prefix, 'dosdevices/c:')); }
+    }
+    let setups = 0;
+    await expect(setupPipeline(f, pack, async () => {
+      setups++;
+      // Model the first writes made by normal bottle setup.
+      await fs.writeFile(path.join(prefix, 'drive_c/windows/system32/winhttp.dll'), 'changed DLL');
+      await fs.writeFile(path.join(prefix, 'user.reg'), 'changed registry');
+      return { command: '/runner', compatibilityDataPath: prefix };
+    })).rejects.toThrow(/symlinks|links|own drive_c/);
+    expect(setups).toBe(0);
+    expect(await fs.readFile(path.join(outside, 'user.reg'), 'utf8')).toBe('keep user registry');
+    expect(await fs.readFile(path.join(outside, 'drive_c/windows/system32/winhttp.dll'), 'utf8')).toBe('keep DLL');
+  });
+  it('rechecks setup paths after stock initialization and before patched-engine setup', async () => {
+    const f = await fixture(), pack = (await prepareGameCompatibilityPack(f.request, f.deps))!;
+    const prefix = path.join(pack.bottlesRoot, 'xbox'), outside = path.join(f.root, 'outside'); await fs.mkdir(outside);
+    await fs.writeFile(path.join(outside, 'winhttp.dll'), 'keep DLL'); let setups = 0;
+    await expect(setupPipeline(f, pack, async () => {
+      setups++;
+      if (setups === 1) {
+        await fs.mkdir(path.join(prefix, 'drive_c/windows'), { recursive: true });
+        await fs.symlink(outside, path.join(prefix, 'drive_c/windows/system32'));
+      } else await fs.writeFile(path.join(prefix, 'drive_c/windows/system32/winhttp.dll'), 'changed DLL');
+      return { command: '/runner', compatibilityDataPath: prefix };
+    })).rejects.toThrow('symlinks');
+    expect(setups).toBe(1); expect(await fs.readFile(path.join(outside, 'winhttp.dll'), 'utf8')).toBe('keep DLL');
+  });
+  it('accepts first boot and ordinary Wine C:/Z: links in an existing dedicated bottle', async () => {
+    const f = await fixture(), pack = (await prepareGameCompatibilityPack(f.request, f.deps))!;
+    const prefix = path.join(pack.bottlesRoot, 'xbox'); await pack.validatePrefix(prefix);
+    await fs.mkdir(path.join(prefix, 'dosdevices'), { recursive: true }); await fs.mkdir(path.join(prefix, 'drive_c/windows/system32'), { recursive: true });
+    await fs.symlink('../drive_c', path.join(prefix, 'dosdevices/c:')); await fs.symlink('/', path.join(prefix, 'dosdevices/z:'));
+    await fs.writeFile(path.join(prefix, 'system.reg'), 'own registry'); await pack.validatePrefix(prefix);
   });
   it('refuses a symlinked managed cache', async () => {
     const f = await fixture(); await fs.mkdir(f.data); await fs.symlink(f.root, path.join(f.data, 'compatibility-packs'));

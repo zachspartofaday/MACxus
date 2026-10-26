@@ -92,7 +92,11 @@ export async function prepareMacRunner(request: MacRunnerRequest, deps: MacRunne
   // The media replacement is validated for decoding, not first-boot registration.
   // Existing bottles take the normal idempotent setup path; none are shared with
   // other games. The packed runner is written last and used only after setup.
-  if (pack) await deps.prepareCrossOver(crossOver, pack.bottlesRoot, runtimeDlls, request.log, 'win64');
+  if (pack) {
+    await pack.validatePrefix(path.join(pack.bottlesRoot, 'xbox'));
+    await deps.prepareCrossOver(crossOver, pack.bottlesRoot, runtimeDlls, request.log, 'win64');
+    await pack.validatePrefix(path.join(pack.bottlesRoot, 'xbox'));
+  }
   const runner = await deps.prepareCrossOver(pack?.installation ?? crossOver, pack?.bottlesRoot ?? selectedBottles, runtimeDlls, request.log, engine === 'crossover-preview-fex' ? 'arm64' : 'win64');
   if (pack) await pack.configurePrefix(runner.compatibilityDataPath);
   return { runner, engine, profileEnv: { ...profileEnv, ...pack?.environment } };

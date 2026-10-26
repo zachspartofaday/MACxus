@@ -15,7 +15,12 @@ Halo bottle under its application data. Bottle initialization uses unmodified
 Preview first; the patched engine is selected for game execution after setup. The game profile recommends Preview
 Rosetta when it is installed; an explicit FEX selection remains respected.
 
-The pack is selected by Halo's Store ID, never by the title or folder name. Only
+The pack is selected by Halo's Store ID, never by the title or folder name.
+The metadata-free engine copy must pass the original vendor resource seal before
+any DLL or bundle metadata is changed. Older engine copies created without that
+check are ignored, while their dedicated bottle is retained. Bottle directories,
+registry/configuration files, setup destinations and the C: mapping are checked
+before both stock and patched-engine setup; linked paths fail before setup writes. Only
 that launch receives the software-output setting and only that bottle receives
 the Electra configuration. Stable CrossOver, FEX and other games keep their normal
 runners. The installed CrossOver app, shared bottles and game files are not
@@ -106,7 +111,10 @@ to reproduce all three candidate source files exactly.
 
 - First verify the installed Preview version and original DLL hashes against the
   lock. Make a separate copy with `ditto --noqtn --noextattr --norsrc`. Give it a
-  unique name and bundle identifier, then replace only that copy's two DLLs in
+  unique name only. Before changing its bundle identifier or DLLs, verify the
+  metadata-free copy with `codesign --verify --deep --strict`; this checks the
+  original vendor resource seal. After it passes, assign a unique bundle
+  identifier and replace only that copy's two DLLs in
   `Contents/SharedSupport/CrossOver/lib/wine/x86_64-windows/`.
 - Locally ad-hoc sign the test app with `codesign --force --sign - --timestamp=none`
   and verify it with `codesign --verify --deep --strict` before execution. Do not
