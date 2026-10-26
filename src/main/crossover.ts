@@ -101,6 +101,15 @@ export function crossOverWrapperScript(cx: CrossOverInstall, bottlesRoot: string
     `export CX_BOTTLE_PATH=${shellQuote(bottlesRoot)}`,
     `export CX_GRAPHICS_BACKEND="\${CX_GRAPHICS_BACKEND:-${graphics}}"`,
     `export WINEPREFIX=${shellQuote(prefix)}`,
+    // CrossOver's launcher replaces WINEDEBUG with CX_DEBUGMSG (default -all).
+    // Preserve explicit CrossOver choices, otherwise forward the game's logging.
+    'if [ "${CX_DEBUGMSG+x}" != x ]; then',
+    '  if [ "${XODUS_NEXUS_VERBOSE_LOGS:-}" = 1 ]; then',
+    '    export CX_DEBUGMSG="${WINEDEBUG:-+timestamp,+pid,+tid,+seh}"',
+    '  else',
+    '    export CX_DEBUGMSG="${WINEDEBUG:--fixme}"',
+    '  fi',
+    'fi',
     'if [ "${1:-}" = "--nexus-stop-prefix" ]; then',
     `  exec ${server} -k`,
     'fi',
