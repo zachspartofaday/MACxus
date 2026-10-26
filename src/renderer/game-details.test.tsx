@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { demoSnapshot } from '../shared/demo-data';
 import { formatMinutes, GameDetailsContent, Gallery } from './GameDetails';
+import { PackageSizeDialog } from './PackageSize';
 import type { GameActivity, GameStoreDetails } from '../shared/types';
 const game=demoSnapshot().games[0];
 const details: GameStoreDetails={productId:game.storeId!,title:game.title,description:'<script>literal text</script>',publisher:'Example publisher',categories:['Strategy','Card & board'],screenshots:['https://store-images.s-microsoft.com/example'],releaseDate:'invalid'};
@@ -30,7 +31,23 @@ it('places public size estimates in stat segments after activity, outside the In
   expect(html.indexOf('Download size')).toBeGreaterThan(html.indexOf('Last played'));
   expect(html.match(/class="gd-stat gd-size-stat"/g)).toHaveLength(2);
   expect(html).toContain('<div class="button-row gd-play-controls"><button>Install</button></div>');
-  expect(render({ status: 'unavailable' })).not.toContain('Download size');
+  expect(render({ status: 'unavailable' })).toContain('Download size');
+});
+
+it('shows the same published size segments beside Play for installed games', () => {
+  const html = render({ status: 'unavailable' }, { ...details, size: { downloadBytes: 3 * 1024 ** 3, installBytes: 4 * 1024 ** 3 } });
+  expect(html).toContain('>Play</button>');
+  expect(html).toContain('Download size'); expect(html).toContain('About 3.0 GiB');
+  expect(html).toContain('Installed size'); expect(html).toContain('About 4.0 GiB');
+  expect(html.indexOf('Download size')).toBeGreaterThan(html.indexOf('Last played'));
+});
+
+it('keeps the size dialog informational, including honest missing-data text', () => {
+  const html = renderToStaticMarkup(<PackageSizeDialog title="A game" value={{ downloadBytes: 1024 ** 3 }} close={() => {}} />);
+  expect(html).toContain('role="dialog"'); expect(html).toContain('aria-modal="true"');
+  expect(html).toContain('Download size'); expect(html).toContain('About 1.0 GiB');
+  expect(html).toContain('Installed size'); expect(html).toContain('Not reported');
+  expect(html).toContain('Microsoft Store estimates.'); expect(html).not.toContain('>Install</button>');
 });
 
 it('shows separate bundle package estimates while browsing instead of inventing one combined size', () => {

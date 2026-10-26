@@ -258,6 +258,15 @@ button.primary svg, button.secondary svg { width: 17px; height: 17px; }
 .catalog-card-install:not(:disabled):hover { background: #388e35; color: #fff; border-color: #388e35; }
 .catalog-card-install:disabled { opacity: .42; cursor: not-allowed; }
 .catalog-card-install svg { width: 14px; height: 14px; }
+.catalog-card-actions { display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+.catalog-card-actions .catalog-card-install { margin: 0; }
+.package-size-info { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 34px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #aab2bb; cursor: pointer; }
+.package-size-info svg { width: 17px; height: 17px; }
+.package-size-info:hover { background: #ffffff0c; color: #fff; }
+.package-size-info:focus-visible { outline: 2px solid #9aa2ab; outline-offset: 1px; }
+.package-size-dialog { max-width: 420px; }
+.package-size-dialog > .package-size { padding: 12px 0; gap: 12px; }
+.package-size-dialog > .package-size > span { display: flex; justify-content: space-between; gap: 16px; }
 .load-more { padding: 24px 0 4px; display: flex; justify-content: center; }
 .featured-catalog { margin-top: 4px; }
 .catalog-loading { min-height: 260px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px dashed #454a50; color: var(--muted); font-size: 10px; }

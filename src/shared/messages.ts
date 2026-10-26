@@ -1,6 +1,8 @@
 // English source strings are the message keys. Keep placeholders identical in both languages.
 export const italianMessages = {
   "Package sizes": "Dimensioni dei pacchetti",
+  "Download and installed size": "Dimensioni del download e dell’installazione",
+  "Download and installed size for {value0}": "Dimensioni del download e dell’installazione per {value0}",
   "Choose a supported package from this Store offer before installing.": "Scegli un pacchetto supportato da questa offerta dello Store prima di installare.",
   "Download size": "Dimensione del download",
   "Installed size": "Dimensione installata",
