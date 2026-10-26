@@ -42,6 +42,13 @@ pinned SHA-256). They are not bundled.
 repository has no license file; DLLs built from it are not distributed until the author confirms
 the license.
 
+The experimental source-only
+`assets/runtime-patches/crossover-preview-halo-mf-software-output.patch` adapts
+that software-output approach for the pinned Preview Rosetta test in
+[HALO-PREVIEW-MEDIA.md](HALO-PREVIEW-MEDIA.md). It includes private-interface
+compatibility changes and an explicit per-process opt-in. It does not distribute
+DLLs or change the license-confirmation requirement above.
+
 ## Bundled Xodus backend — GPL-3.0
 
 Apple Silicon app bundles include `xodus-cli` and `xodus-service` built from the
