@@ -25,7 +25,8 @@ npm run dist:mac
 node scripts/verify-mac-bundle.mjs release/mac-arm64/MACxus.app
 ```
 
-`dist:mac` first builds the backend from the commit, Cargo lock and checked
+`dist:mac` first prepares the five patched Wine DLLs from the pinned owner release
+(or reuses files matching the manifest), then builds the backend from the commit, Cargo lock and checked
 patches in `assets/backend-source.lock.json`, using the locked Rust version and
 macOS 13 deployment target. Native account-free Rust tests use a disposable
 case-sensitive APFS image so ambiguity/security tests run on normal macOS hosts.
@@ -79,5 +80,6 @@ candidate before official publication. Do not rebuild between approval and
 publication.
 
 `scripts/verify-mac-bundle.mjs` selects the backend from the actual packaged app
-using an empty PATH and a fresh disposable profile. It verifies that the backend
+using an empty PATH and a fresh disposable profile. It also verifies all five
+patched Wine DLLs inside the packaged ASAR against the repository manifest. It verifies that the backend
 is ready with no compiler tools, account/service startup or backend-install state.

@@ -25,7 +25,7 @@ test('native Mac checks cannot package or upload a distribution on a pull reques
 
 test('normal Mac distribution requires its backend and carries it outside ASAR', async () => {
   const config = JSON.parse(await fs.readFile('package.json', 'utf8'));
-  assert.match(config.scripts['dist:mac'], /^npm run build:mac-backend &&/);
+  assert.match(config.scripts['dist:mac'], /^npm run prepare:mac-runtime-dlls && npm run build:mac-backend &&/);
   assert.deepEqual(config.build.mac.extraResources, [{ from: 'bundled/mac-backend', to: 'backend' }]);
   assert.ok(!config.build.extraResources.some(resource => resource.to === 'backend'), 'Linux packaging must not require a Mac backend');
   assert.ok((await fs.readFile('.gitignore', 'utf8')).split('\n').includes('bundled/'));

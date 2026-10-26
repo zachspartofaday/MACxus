@@ -15,7 +15,8 @@
     "test:runtime-tools": "node --import ./scripts/test-environment.mjs --test scripts/eac-trace-summary.test.mjs scripts/wine-exception-metadata.test.mjs scripts/assemble-shared-runtime.test.mjs scripts/build-runtime-dxvk.test.mjs scripts/verify-runtime-base.test.mjs scripts/runtime-compat/staging.test.mjs scripts/runtime-tests/build-store-probes.test.mjs scripts/runtime-tests/build-user-privilege-probe.test.mjs scripts/runtime-tests/build-gamesave-sync-probe.test.mjs scripts/runtime-tests/build-user-audio-probe.test.mjs",
     "test:ci-tools": "node --import ./scripts/test-environment.mjs --test scripts/ci/*.test.mjs",
     "build:mac-backend": "tsc -p tsconfig.electron.json && node scripts/build-mac-backend.mjs",
-    "dist:mac": "npm run build:mac-backend && npm run clean && npm run typecheck && vite build && tsc -p tsconfig.electron.json && electron-builder --mac dmg --arm64 --publish never",
+    "prepare:mac-runtime-dlls": "node scripts/prepare-mac-runtime-dlls.mjs",
+    "dist:mac": "npm run prepare:mac-runtime-dlls && npm run build:mac-backend && npm run clean && npm run typecheck && vite build && tsc -p tsconfig.electron.json && electron-builder --mac dmg --arm64 --publish never",
     "build": "npm run clean && npm run typecheck && npm run test && vite build && tsc -p tsconfig.electron.json",
     "dist": "npm run build && electron-builder --linux AppImage --publish never",
     "pack": "npm run build && electron-builder --linux dir --publish never"
@@ -26,6 +27,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
@@ -53,12 +55,29 @@
       "package.json",
       "LICENSE"
     ],
-    "extraResources": [{ "from": "assets/fonts", "to": "fonts" }],
+    "extraResources": [
+      {
+        "from": "assets/fonts",
+        "to": "fonts"
+      }
+    ],
     "afterPack": "scripts/launcher-fonts-after-pack.cjs",
     "mac": {
       "category": "public.app-category.games",
-      "extraResources": [{ "from": "bundled/mac-backend", "to": "backend" }],
-      "target": [{ "target": "dmg", "arch": ["arm64"] }],
+      "extraResources": [
+        {
+          "from": "bundled/mac-backend",
+          "to": "backend"
+        }
+      ],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
       "icon": "assets/icon.png",
       "identity": null,
       "artifactName": "MACxus-${version}-${arch}.${ext}"
