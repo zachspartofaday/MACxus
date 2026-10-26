@@ -11,6 +11,8 @@ it('offers size information beside Install without adding size text to the libra
   expect(html).toContain('aria-label="Download and installed size for A game"');
   expect(html).toContain('aria-haspopup="dialog"');
   expect(html).toContain('aria-expanded="false"');
+  const info = html.match(/<button[^>]*class="package-size-info"[^>]*>/)?.[0];
+  expect(info).toContain('data-gamepad-card-options');
   expect(html.indexOf('class="package-size-info"')).toBeGreaterThan(html.indexOf('class="catalog-card-install"'));
   expect(html).not.toContain('About 1.0 GiB');
   expect(html).not.toContain('package-size compact');

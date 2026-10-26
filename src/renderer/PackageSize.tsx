@@ -38,7 +38,7 @@ export function PackageSizeInfo({ title, value }: { title: string; value?: Size 
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   return <>
-    <button type="button" className="package-size-info" aria-label={t("Download and installed size for {value0}", { value0: title })} title={t("Download and installed size")} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><Info aria-hidden="true" /></button>
+    <button type="button" className="package-size-info" data-gamepad-card-options aria-label={t("Download and installed size for {value0}", { value0: title })} title={t("Download and installed size")} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><Info aria-hidden="true" /></button>
     {open ? createPortal(<PackageSizeDialog title={title} value={value} close={() => setOpen(false)} />, document.body) : null}
   </>;
 }
