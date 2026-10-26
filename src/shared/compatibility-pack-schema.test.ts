@@ -10,7 +10,7 @@ describe('compatibility pack metadata boundaries', () => {
     expect(parseCompatibilityManifest(reference, catalog.packs[0]).id).toBe('halo-preview-media-v1');
   });
   it.each([
-    ['id', '../escape'], ['id', 'CASE-COLLISION'], ['schemaVersion', 2], ['kind', 'shell-script'], ['recipe', 'download-and-execute'],
+    ['id', '../escape'], ['id', 'CASE-COLLISION'], ['schemaVersion', 2], ['kind', 'shell-script'], ['recipe', 'download-and-execute'], ['buildPathPolicy', 'absolute-source'], ['buildPathPolicy', undefined],
     ['engine', 'crossover-preview-fex'], ['engineDirectory', '../bottles'], ['engineDirectory', 'Bottles'],
     ['appName', 'MACxus ../Other.app'], ['appName', 'MACxus Bad\nName.app'],
     ['dlls', { '../escape.dll': 'a'.repeat(64) }], ['dlls', { 'mfplat.dll': 'invalid' }],

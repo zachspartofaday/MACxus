@@ -6,7 +6,7 @@ export interface UnrealIniAction {
   section: string; values: Record<string, string>; readOnly: boolean;
 }
 export interface CompatibilityManifest extends CompatibilityRoute {
-  schemaVersion: 1; kind: 'wine-engine-overlay'; recipe: 'wine-pe-v1'; name: string;
+  schemaVersion: 1; kind: 'wine-engine-overlay'; recipe: 'wine-pe-v1'; buildPathPolicy: 'relative-source-v1'; name: string;
   engineDirectory: string; appName: string; dlls: Record<string, string>; originalDLLs: Record<string, string>;
   unixLibraries: Record<string, string>; environment: Record<string, string>; configuration: UnrealIniAction[];
   source: { url: string; archive: string; sha256: string; wineSubdirectory: string };

@@ -21,6 +21,7 @@ async function fixture(temp) {
       'COPYING.LIB': 'test-license',
       'source/build-scripts/prepare-compatibility-packs.mjs': 'test-build-recipe',
       'source/build-scripts/compatibility-packs.mjs': 'test-verifier',
+      'source/build-scripts/compatibility-pack-build.mjs': 'test-relative-build-policy',
       'source/src/shared/compatibility-pack-schema.mjs': 'test-schema',
       'README.md': 'test-attribution-and-instructions',
       [`source/${path.posix.basename(manifest.patch.path)}`]: 'test-source-patch',

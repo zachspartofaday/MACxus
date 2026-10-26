@@ -17,7 +17,7 @@ export async function verifyCompatibilityPack(read, entry) {
   for (const [file, expected] of Object.entries(files)) {
     if (digest(await read(file)) !== expected) throw Error(`Compatibility pack checksum mismatch: ${file}`);
   }
-  for (const file of ['source/build-scripts/prepare-compatibility-packs.mjs', 'source/build-scripts/compatibility-packs.mjs', 'source/src/shared/compatibility-pack-schema.mjs', 'README.md']) {
+  for (const file of ['source/build-scripts/prepare-compatibility-packs.mjs', 'source/build-scripts/compatibility-packs.mjs', 'source/build-scripts/compatibility-pack-build.mjs', 'source/src/shared/compatibility-pack-schema.mjs', 'README.md']) {
     if (!(await read(file)).length) throw Error(`Missing compatibility pack source instructions: ${file}`);
   }
   return manifest;

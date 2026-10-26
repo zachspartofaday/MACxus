@@ -67,5 +67,10 @@
     "automaticGameScopedPreparation": true,
     "winevideoLicense": "LGPL per author documentation",
     "licenseDocumentation": "https://github.com/Jfishin/winevideo/wiki/Building-and-Patch-Provenance#licensing-and-attribution"
+  },
+  "buildPathPolicy": "relative-source-v1",
+  "buildTimestamps": {
+    "mfplat.dll": 1792987496,
+    "winegstreamer.dll": 1792989507
   }
 }

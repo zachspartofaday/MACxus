@@ -54,7 +54,10 @@ isolation from concurrent external filesystem mutation.
    original/replacement DLL SHA-256 values, required Unix library SHA-256 values,
    source archive URL/filename/hash, source patch path/hash, original/patched
    source-file hashes, per-DLL reproducible timestamps and LGPL license hash.
-   Supply the license and a README with attribution, reproduction and limitations.
+   Record `buildPathPolicy: "relative-source-v1"`: configure must be invoked with
+   its path relative to the build directory so `__FILE__` literals cannot embed
+   the random temporary root. Supply the license and a README with attribution,
+   reproduction and limitations.
 4. Declare only the actions the game needs. `environment` accepts `MACXUS_*`
    feature opt-ins with simple values, never loader, PATH or WINEPREFIX overrides.
    `configuration` accepts `unreal-ini` actions with a project, Windows/WinGDK,
@@ -69,7 +72,10 @@ isolation from concurrent external filesystem mutation.
 6. Run `npm run prepare:mac-media-pack`. This prepares every registered pack.
    To prepare one pack, use `npm run prepare:mac-media-pack -- --pack <id>`.
    Local `--source-archive` and `--dll-dir` options require one selected pack.
-   They reuse only checksum-matching inputs. Generated payloads/source directories
+   They reuse only checksum-matching inputs. Use `--rebuild` (without `--dll-dir`)
+   to force clean source compilation in a fresh temporary directory, and repeat
+   under a different `TMPDIR` when validating reproducibility. Generated payloads
+   and source directories
    remain outside Git; distribution builds include them with source and recipes.
 7. Run the contributing checks and add routing, safety and game-specific tests.
    Package verification must reject a missing/corrupt payload or source in any

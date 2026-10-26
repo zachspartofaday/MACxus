@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { verifyCompatibilityPackDirectory } from './compatibility-packs.mjs';
+import { compatibilityPackConfigure } from './compatibility-pack-build.mjs';
 import { parseCompatibilityCatalog, parseCompatibilityManifest } from '../src/shared/compatibility-pack-schema.mjs';
 
 if (process.platform !== 'darwin') throw Error('Compatibility pack preparation requires macOS.');
@@ -19,6 +20,7 @@ const option = name => {
   if (!process.argv[index + 1] || process.argv[index + 1].startsWith('--')) throw Error(`${name} requires a value.`);
   return process.argv[index + 1];
 };
+if (process.argv.includes('--rebuild') && option('--dll-dir')) throw Error('--rebuild cannot reuse --dll-dir artifacts.');
 const selectedId = option('--pack');
 const selected = selectedId ? catalog.packs.filter(entry => entry.id === selectedId) : catalog.packs;
 if (selectedId && !selected.length) throw Error(`Unknown compatibility pack: ${selectedId}`);
@@ -47,7 +49,7 @@ for (const entry of selected) {
     const patch = path.join(project, lock.patch.path);
     if (hash(await fs.readFile(patch)) !== lock.patch.sha256) throw Error('Compatibility pack patch checksum mismatch.');
     const payload = path.join(root, 'payload');
-    let payloadValid = true;
+    let payloadValid = !process.argv.includes('--rebuild');
     for (const [name, expected] of Object.entries(lock.dlls)) {
       try { if (hash(await fs.readFile(path.join(payload, name))) !== expected) payloadValid = false; }
       catch { payloadValid = false; }
@@ -70,7 +72,7 @@ for (const entry of selected) {
       }
       const build = path.join(work, 'build'); await fs.mkdir(build);
       const env = { ...process.env, CC: 'clang -arch x86_64', CXX: 'clang++ -arch x86_64', PATH: ['/opt/homebrew/opt/bison/bin', '/usr/local/opt/bison/bin', process.env.PATH].filter(Boolean).join(':') };
-      execute(path.join(source, 'configure'), ['--host=x86_64-apple-darwin', '--enable-win64', '--enable-archs=x86_64', '--without-x', '--without-wayland', '--without-gstreamer', '--enable-winegstreamer', '--without-cups', '--without-pulse', '--without-alsa', '--without-oss', '--without-dbus', '--without-gphoto', '--without-sane', '--without-v4l2', '--without-pcap', '--without-usb', '--without-capi', '--without-freetype', '--without-gnutls', '--without-opengl', '--without-vulkan', '--disable-tests'], { cwd: build, env });
+      execute(compatibilityPackConfigure(build, source), ['--host=x86_64-apple-darwin', '--enable-win64', '--enable-archs=x86_64', '--without-x', '--without-wayland', '--without-gstreamer', '--enable-winegstreamer', '--without-cups', '--without-pulse', '--without-alsa', '--without-oss', '--without-dbus', '--without-gphoto', '--without-sane', '--without-v4l2', '--without-pcap', '--without-usb', '--without-capi', '--without-freetype', '--without-gnutls', '--without-opengl', '--without-vulkan', '--disable-tests'], { cwd: build, env });
       for (const name of Object.keys(lock.dlls)) {
         execute('/usr/bin/make', ['-j8', `dlls/${name.replace(/\.dll$/, '')}/x86_64-windows/${name}`], { cwd: build, env: { ...env, SOURCE_DATE_EPOCH: String(lock.buildTimestamps[name]) } });
       }
@@ -86,7 +88,7 @@ for (const entry of selected) {
       const bytes = new Map();
       for (const [name, expected] of Object.entries(lock.dlls)) {
         const data = await fs.readFile(path.join(built, name));
-        if (hash(data) !== expected) throw Error(`${lock.id}: ${name} is not the accepted artifact. A different toolchain needs new validation and a manifest update.`);
+        if (hash(data) !== expected) throw Error(`${lock.id}: ${name} is not the accepted artifact. Check the recorded relative source-path policy, compiler/linker/strip versions and timestamps. Changed bytes require validation before updating the manifest.`);
         bytes.set(name, data);
       }
       await fs.mkdir(payload, { recursive: true });
@@ -95,7 +97,7 @@ for (const entry of selected) {
     await fs.copyFile(patch, path.join(root, 'source', path.posix.basename(lock.patch.path)));
     const recipe = path.join(root, 'source/build-scripts');
     await fs.mkdir(recipe, { recursive: true });
-    for (const name of ['prepare-compatibility-packs.mjs', 'compatibility-packs.mjs']) await fs.copyFile(path.join(project, 'scripts', name), path.join(recipe, name));
+    for (const name of ['prepare-compatibility-packs.mjs', 'compatibility-packs.mjs', 'compatibility-pack-build.mjs']) await fs.copyFile(path.join(project, 'scripts', name), path.join(recipe, name));
     const schema = path.join(root, 'source/src/shared');
     await fs.mkdir(schema, { recursive: true });
     await fs.copyFile(path.join(project, 'src/shared/compatibility-pack-schema.mjs'), path.join(schema, 'compatibility-pack-schema.mjs'));
