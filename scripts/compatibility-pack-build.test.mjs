@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { compatibilityPackConfigure } from './compatibility-pack-build.mjs';
 
@@ -23,6 +24,8 @@ test('stripped PE __FILE__ strings and bytes reproduce across different absolute
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'macxus-pe-path-'));
   try {
     const outputs = [];
+    const timestamp = 1792989507;
+    const env = { ...process.env, SOURCE_DATE_EPOCH: String(timestamp) };
     for (const name of ['short', 'a-much-longer-and-different-build-directory']) {
       const work = path.join(root, name), build = path.join(work, 'build'), source = path.join(work, 'sources/wine');
       await fs.mkdir(path.join(source, 'libs/strmbase'), { recursive: true }); await fs.mkdir(build);
@@ -31,13 +34,16 @@ test('stripped PE __FILE__ strings and bytes reproduce across different absolute
       await fs.writeFile(path.join(source, 'libs/strmbase/seeking.c'), 'const char *source_name = __FILE__ ": SourceSeeking.cs";\nint main(void) { return source_name[0] == 0; }\n');
       const configure = compatibilityPackConfigure(build, source);
       const input = path.join(path.dirname(configure), 'libs/strmbase/seeking.c');
-      execFileSync(compiler, ['-g', '-O2', input, '-o', 'probe.exe', '-Wl,--no-insert-timestamp'], { cwd: build, stdio: 'pipe' });
-      execFileSync(strip, ['--strip-debug', 'probe.exe'], { cwd: build, stdio: 'pipe' });
+      execFileSync(compiler, ['-g', '-O2', input, '-o', 'probe.exe'], { cwd: build, env, stdio: 'pipe' });
+      execFileSync(strip, ['--strip-debug', 'probe.exe'], { cwd: build, env, stdio: 'pipe' });
       const bytes = await fs.readFile(path.join(build, 'probe.exe'));
+      // Some binutils builds stamp PE headers during strip. Mirror the real
+      // recipe's fixed epoch for both compile/link and strip, not linker alone.
+      assert.equal(bytes.readUInt32LE(bytes.readUInt32LE(0x3c) + 8), timestamp);
       assert.ok(bytes.includes(Buffer.from('../sources/wine/libs/strmbase/seeking.c: SourceSeeking.cs')));
       assert.ok(!bytes.includes(Buffer.from(root)));
-      outputs.push(bytes);
+      outputs.push(createHash('sha256').update(bytes).digest('hex'));
     }
-    assert.deepEqual(outputs[0], outputs[1]);
+    assert.equal(outputs[0], outputs[1], 'stripped PE hashes differ between source roots');
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
