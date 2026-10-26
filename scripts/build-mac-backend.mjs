@@ -7,13 +7,14 @@ import { execFileSync } from 'node:child_process';
 import { backendLock as lock, backendRecipeSha256 } from '../dist-electron/main/backend-package.js';
 import { MAC_BACKEND_FILES, readBundledBackend } from '../dist-electron/main/bundled-backend.js';
 import { resolveMacSigningIdentity, signMacBackend, verifyMacBackendSigning } from './mac-backend-signing.mjs';
+import { detachMacTestVolume } from './mac-test-volume.mjs';
 
 if (process.platform !== 'darwin' || process.arch !== 'arm64') throw Error('Build the bundled backend on an Apple Silicon Mac.');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const checkOnly = process.argv.includes('--check');
 if (process.argv.slice(2).some(arg => arg !== '--check')) throw Error('Usage: build-mac-backend.mjs [--check]');
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
-const buildRecipeSha256 = sha(Buffer.concat([await fs.readFile(fileURLToPath(import.meta.url)), await fs.readFile(new URL('./mac-backend-signing.mjs', import.meta.url))]));
+const buildRecipeSha256 = sha(Buffer.concat([await fs.readFile(fileURLToPath(import.meta.url)), await fs.readFile(new URL('./mac-backend-signing.mjs', import.meta.url)), await fs.readFile(new URL('./mac-test-volume.mjs', import.meta.url))]));
 const signingIdentity = checkOnly ? null : resolveMacSigningIdentity(process.env.MACXUS_SIGNING_IDENTITY);
 const output = path.join(root, 'bundled/mac-backend');
 if (!checkOnly) {
@@ -62,7 +63,7 @@ try {
   cargo(['test', ...features, '-p', 'xodus-service', 'store_']);
 } finally {
   if (oldTmp === undefined) delete env.TMPDIR; else env.TMPDIR = oldTmp;
-  command('hdiutil', ['detach', fixtureRoot], false, root);
+  await detachMacTestVolume(fixtureRoot);
   await fs.rm(image);
 }
 cargo(['build', ...features, '-p', 'xodus-cli', '-p', 'xodus-service']);
@@ -104,6 +105,7 @@ await fs.copyFile(path.join(root, 'assets/backend-source.lock.json'), path.join(
 for (const patch of lock.patches) await fs.copyFile(path.join(root, 'assets', patch.file), path.join(recipe, 'assets', patch.file));
 await fs.copyFile(fileURLToPath(import.meta.url), path.join(recipe, 'scripts/build-mac-backend.mjs'));
 await fs.copyFile(new URL('./mac-backend-signing.mjs', import.meta.url), path.join(recipe, 'scripts/mac-backend-signing.mjs'));
+await fs.copyFile(new URL('./mac-test-volume.mjs', import.meta.url), path.join(recipe, 'scripts/mac-test-volume.mjs'));
 await fs.writeFile(path.join(recipe, 'BUILD.txt'), `GPL-3.0 backend; dependency licenses retained in source/vendor.\nRust ${lock.rust}; macOS SDK and protoc required for rebuilding only.\nFrom source/: MACOSX_DEPLOYMENT_TARGET=13.0 cargo +${lock.rust} build --locked --offline --release --no-default-features -p xodus-cli -p xodus-service\nAuth UI: Electron. Never run xodus-service to inspect it; it accesses account services.\n`);
 // Supply an explicit file list instead of BSD/GNU tar exclusion semantics. Preserve
 // nested dependency directories named target while excluding checkout metadata.
