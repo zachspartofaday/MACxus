@@ -425,8 +425,9 @@ function libraryInstallAction(t: Translator, product: CatalogProduct, present: b
 
 function libraryProductPresence(data: AppSnapshot, product: CatalogProduct) {
   const ids = [product.productId, product.installProductId].filter(Boolean).map(id => id!.toUpperCase());
+  const installedGame = data.games.find(game => ids.includes(game.storeId?.toUpperCase() ?? ''));
   return {
-    present: data.games.some(game => ids.includes(game.storeId?.toUpperCase() ?? '')),
+    present: Boolean(installedGame), installedGame,
     downloading: data.downloads.some(task => ['running', 'queued', 'paused'].includes(task.status) && ids.includes(task.productId.toUpperCase())),
   };
 }
@@ -473,9 +474,9 @@ export function LibraryProductCard({ product, present, downloading, installing, 
 function LibraryProductDetails({ product, data, toast, back }: { product: LibraryProduct; data: AppSnapshot; toast: (value: Toast) => void; back: () => void }) {
   const { t } = useI18n();
   const { installing, install } = useLibraryInstall(data, toast);
-  const { present, downloading } = libraryProductPresence(data, product);
+  const { present, downloading, installedGame } = libraryProductPresence(data, product);
   const { disabled, label } = libraryInstallAction(t, product, present, downloading, installing, data.backend.capabilities.streaming);
-  const game: Game = { id: product.productId, title: product.title, path: '', storeId: product.productId, publisher: product.publisher,
+  const game: Game = installedGame ?? { id: product.productId, title: product.title, path: '', storeId: product.productId, publisher: product.publisher,
     coverUrl: product.posterUrl, heroUrl: product.heroUrl, installState: 'ready', addedAt: '' };
   return <GameDetails key={`${product.productId}:${data.auth.username}:${data.auth.stored}:${data.auth.running}:${data.backend.binaryPath}:${data.settings.market}`} game={game} data={data} back={back}
     installPreview={!present}
