@@ -160,3 +160,15 @@ it('offers DualSense compatibility per game, off by default and with feature lim
   expect(on).toContain('Does not change Xbox controller settings');
   expect(on).toContain('adaptive triggers may be unavailable');
 });
+
+it('offers DLSS only on macOS with its requirements and per-game state', () => {
+  const render = (mac: boolean, dlss = false) => renderToStaticMarkup(<GameLaunchToolFields value={{ ...defaultLaunchTools, dlss }} change={() => {}} mac={mac} />);
+  expect(render(false)).not.toContain('Enable DLSS');
+  const off = render(true), on = render(true, true);
+  expect(off).toContain('Enable DLSS (CrossOver)');
+  expect(off).not.toContain('checked');
+  expect(on).toContain('checked');
+  expect(on).toContain('macOS Tahoe or newer for D3DMetal, Sonoma or newer for DXMT');
+  expect(on).toContain('Also select DLSS in the game&#x27;s graphics settings');
+  expect(on).toContain('Does not affect other engines');
+});

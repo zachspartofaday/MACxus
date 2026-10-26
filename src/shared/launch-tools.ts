@@ -1,6 +1,6 @@
 import type { GameLaunchTools } from './types.js';
 
-export const defaultLaunchTools: GameLaunchTools = { dualSenseCompatibility: false, offlineWithoutAntiCheat: false, metalHud: false, mangoHud: false, gamescope: false, gamescopeArgs: '', launchOptions: '' };
+export const defaultLaunchTools: GameLaunchTools = { dualSenseCompatibility: false, offlineWithoutAntiCheat: false, metalHud: false, dlss: false, mangoHud: false, gamescope: false, gamescopeArgs: '', launchOptions: '' };
 
 /** Command words only, never a shell program. Quotes group literal arguments. */
 export function commandWords(input: string): string[] {
@@ -49,7 +49,8 @@ export function normalizeLaunchTools(value: unknown): GameLaunchTools {
   if (tools.dualSenseCompatibility !== undefined && typeof tools.dualSenseCompatibility !== 'boolean') throw Error('Invalid DualSense compatibility setting.');
   if (tools.offlineWithoutAntiCheat !== undefined && typeof tools.offlineWithoutAntiCheat !== 'boolean') throw Error('Invalid offline anti-cheat setting.');
   if (tools.metalHud !== undefined && typeof tools.metalHud !== 'boolean') throw Error('Invalid Metal HUD setting.');
-  const result = { dualSenseCompatibility: tools.dualSenseCompatibility ?? false, offlineWithoutAntiCheat: tools.offlineWithoutAntiCheat ?? false, metalHud: tools.metalHud ?? false, mangoHud: tools.mangoHud, gamescope: tools.gamescope, gamescopeArgs: tools.gamescopeArgs.trim(), launchOptions: tools.launchOptions.trim() };
+  if (tools.dlss !== undefined && typeof tools.dlss !== 'boolean') throw Error('Invalid DLSS setting.');
+  const result = { dualSenseCompatibility: tools.dualSenseCompatibility ?? false, offlineWithoutAntiCheat: tools.offlineWithoutAntiCheat ?? false, metalHud: tools.metalHud ?? false, dlss: tools.dlss ?? false, mangoHud: tools.mangoHud, gamescope: tools.gamescope, gamescopeArgs: tools.gamescopeArgs.trim(), launchOptions: tools.launchOptions.trim() };
   const args = commandWords(result.gamescopeArgs);
   if (args.includes('--') || args.some(arg => arg.includes('%command%'))) throw Error('Gamescope options must not include -- or %command%; Nexus adds the game command.');
   parseLaunchOptions(result.launchOptions);

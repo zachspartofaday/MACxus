@@ -121,7 +121,7 @@ describe('inspectGameDirectory anti-cheat support', () => {
     const root=await mkdtemp(path.join(tmpdir(),'nexus-game-tool-state-')); created.push(root);
     const store=new StateStore(root);
     const game={id:'test-tools',title:'Synthetic game',path:'/sample/game',installState:'ready' as const,addedAt:'2026-10-16T00:00:00Z'};
-    const launchTools={dualSenseCompatibility:true,mangoHud:true,gamescope:false,gamescopeArgs:'',launchOptions:'DXVK_HUD=fps %command% --launcher-skip'};
+    const launchTools={dualSenseCompatibility:true,dlss:true,mangoHud:true,gamescope:false,gamescopeArgs:'',launchOptions:'DXVK_HUD=fps %command% --launcher-skip'};
     await store.upsertGame(game); await store.patchGame(game.id,{launchTools});
     const reopened=new StateStore(root); await reopened.load();
     expect(reopened.games[0].launchTools).toEqual(launchTools);

@@ -640,7 +640,9 @@ export function GameLaunchToolFields({ value, change, antiCheat = false, mac = f
     <label className="tool-checkbox"><input type="checkbox" checked={value.dualSenseCompatibility === true} onChange={event => update({ dualSenseCompatibility: event.target.checked })} /><span>{t("DualSense compatibility mode")}</span></label>
     <small>{t("Try this if a standard DualSense controller is not detected. Disables its native HIDRAW input for this game only. Advanced haptics and adaptive triggers may be unavailable. Does not change Xbox controller settings.")}</small>
     {/* MangoHud and gamescope exist only on Linux; macOS offers Apple's Metal HUD instead. */}
-    {mac ? <><label className="tool-checkbox"><input type="checkbox" checked={value.metalHud === true} onChange={event => update({ metalHud: event.target.checked })} /><span>{t("Show Metal performance HUD")}</span></label>
+    {mac ? <><label className="tool-checkbox"><input type="checkbox" checked={value.dlss === true} onChange={event => update({ dlss: event.target.checked })} /><span>{t("Enable DLSS (CrossOver)")}</span></label>
+    <small>{t("Enables CrossOver's DLSS support for this game. Requires a compatible game and Apple silicon: macOS Tahoe or newer for D3DMetal, Sonoma or newer for DXMT. Also select DLSS in the game's graphics settings. Does not affect other engines.")}</small>
+    <label className="tool-checkbox"><input type="checkbox" checked={value.metalHud === true} onChange={event => update({ metalHud: event.target.checked })} /><span>{t("Show Metal performance HUD")}</span></label>
     <small>{t("Apple's on-screen overlay with frame rate, frame time and GPU memory, for games rendered through D3DMetal.")}</small></> : <>
     <label className="tool-checkbox"><input type="checkbox" checked={value.mangoHud} onChange={event => update({ mangoHud: event.target.checked })} /><span>{t("Enable MangoHud")}</span></label>
     <label className="tool-checkbox"><input type="checkbox" checked={value.gamescope} onChange={event => update({ gamescope: event.target.checked })} /><span>{t("Run in gamescope")}</span></label>

@@ -90,6 +90,8 @@ export interface GameLaunchTools {
   offlineWithoutAntiCheat?: boolean;
   /** macOS: Apple's Metal performance HUD (MTL_HUD_ENABLED) over the game. */
   metalHud?: boolean;
+  /** CrossOver: expose DLSS through D3DMetal / DXMT for this game only. */
+  dlss?: boolean;
   mangoHud: boolean;
   gamescope: boolean;
   gamescopeArgs: string;

@@ -1,5 +1,8 @@
 // English source strings are the message keys. Keep placeholders identical in both languages.
 export const italianMessages = {
+  "Enable DLSS (CrossOver)": "Abilita DLSS (CrossOver)",
+  "Enables CrossOver's DLSS support for this game. Requires a compatible game and Apple silicon: macOS Tahoe or newer for D3DMetal, Sonoma or newer for DXMT. Also select DLSS in the game's graphics settings. Does not affect other engines.": "Abilita il supporto DLSS di CrossOver per questo gioco. Richiede un gioco compatibile e Apple silicon: macOS Tahoe o successivo per D3DMetal, Sonoma o successivo per DXMT. Seleziona DLSS anche nelle impostazioni grafiche del gioco. Non influisce sugli altri motori.",
+  "Invalid DLSS setting.": "Impostazione DLSS non valida.",
   "Secret achievement": "Obiettivo segreto",
   "Reveal the details only if you want to see spoilers.": "Rivela i dettagli solo se vuoi vedere gli spoiler.",
   "Unlocked": "Sbloccato",
