@@ -1,0 +1,114 @@
+--- a/dlls/xgameruntime/xthreading.c
++++ b/dlls/xgameruntime/xthreading.c
+@@ -265,6 +265,7 @@
+     BOOL completion_finished;
+     BOOL provider_cleanup_finished;
+     DWORD completion_thread;
++    BOOL result_consumed;
+ };
+ 
+ static inline struct async_state *async_state( XAsyncBlock *asyncBlock )
+@@ -292,7 +293,11 @@
+     BOOL cleanup = FALSE;
+     EnterCriticalSection( &state->cs );
+     state->cleanup_requested = TRUE;
+-    if (!state->active_provider && !state->cleaned)
++    /* Native XAsync retains provider state for the queued completion callback.
++     * GetResult may consume the result during (or before) that callback, but
++     * its provider-owned data must remain alive until the callback returns. */
++    if (!state->active_provider && !state->cleaned &&
++        (!state->callback || state->completion_finished))
+     {
+         state->cleaned = 1;
+         cleanup = TRUE;
+@@ -313,7 +318,9 @@
+     HRESULT hr;
+     BOOL cleanup = FALSE;
+     EnterCriticalSection( &state->cs );
+-    if (state->cleaned)
++    /* Consuming the result detaches the operation from later provider calls,
++     * even while Cleanup retains its captured data for completion. */
++    if (state->cleaned || (state->result_consumed && op != XAsyncOp_GetResult))
+     {
+         LeaveCriticalSection( &state->cs );
+         return E_ABORT;
+@@ -322,7 +329,8 @@
+     LeaveCriticalSection( &state->cs );
+     hr = state->provider( op, &state->data );
+     EnterCriticalSection( &state->cs );
+-    if (!--state->active_provider && state->cleanup_requested && !state->cleaned)
++    if (!--state->active_provider && state->cleanup_requested && !state->cleaned &&
++        (!state->callback || state->completion_finished))
+     {
+         state->cleaned = 1;
+         cleanup = TRUE;
+@@ -524,6 +532,7 @@
+ 
+ static void CALLBACK async_completion_callback( struct async_state *state, BOOLEAN canceled )
+ {
++    BOOL cleanup;
+     if (canceled) async_invoke_provider( state, XAsyncOp_Cancel );
+     EnterCriticalSection( &state->cs );
+     state->completion_thread = GetCurrentThreadId();
+@@ -532,13 +541,14 @@
+     EnterCriticalSection( &state->cs );
+     state->completion_thread = 0;
+     state->completion_finished = TRUE;
++    cleanup = state->cleanup_requested || canceled || FAILED(state->status) || !state->data.bufferSize;
+     LeaveCriticalSection( &state->cs );
+     SetEvent( state->provider_block.internal[3] );
+     /* The application may delete or reuse XAsyncBlock inside its completion
+      * callback. Only the runtime-owned state may be touched after it returns.
+      * GetResult may already have cleaned the provider; cleaned makes this
+      * idempotent without dereferencing the caller's freed block. */
+-    if (canceled || FAILED(state->status) || !state->data.bufferSize)
++    if (cleanup)
+         async_cleanup_state( state, state->provider );
+     async_release_queue( state );
+ }
+@@ -577,20 +587,43 @@
+     TRACE( "iface %p asyncBlock %p, identity %p, bufferSize %Iu, buffer %p, bufferUsed %p.\n", iface, asyncBlock, identity, bufferSize, buffer, bufferUsed );
+     if (FAILED(hr = x_threading_XAsyncGetStatus( iface, asyncBlock, FALSE ))) return hr;
+     state = async_state( asyncBlock );
++    EnterCriticalSection( &state->cs );
+     required = state->data.bufferSize;
+     if (!required)
+     {
++        LeaveCriticalSection( &state->cs );
+         if (bufferUsed) *bufferUsed = 0;
+         return S_OK;
+     }
+-    if (identity != asyncBlock->internal[2] || !buffer) return E_INVALIDARG;
+-    if (bufferSize < required) return HRESULT_FROM_WIN32( ERROR_INSUFFICIENT_BUFFER );
++    if (state->result_consumed)
++    {
++        LeaveCriticalSection( &state->cs );
++        return E_ILLEGAL_METHOD_CALL;
++    }
++    if (identity != asyncBlock->internal[2] || !buffer)
++    {
++        LeaveCriticalSection( &state->cs );
++        return E_INVALIDARG;
++    }
++    if (bufferSize < required)
++    {
++        LeaveCriticalSection( &state->cs );
++        return HRESULT_FROM_WIN32( ERROR_INSUFFICIENT_BUFFER );
++    }
++    /* Detach payload retrieval independently of provider cleanup. The provider
++     * may transfer ownership, while completion still needs its captured data.
++     * Claim before invoking it so concurrent or reentrant callers cannot
++     * retrieve the same payload twice. Validation failures remain retryable. */
++    state->result_consumed = TRUE;
+     /* GDK supplies the caller's capacity to GetResult, not the minimum
+      * payload size reported at Complete. Keep bufferUsed at that minimum. */
+     state->data.bufferSize = bufferSize;
+     state->data.buffer = buffer;
++    LeaveCriticalSection( &state->cs );
+     hr = async_invoke_provider( state, XAsyncOp_GetResult );
++    EnterCriticalSection( &state->cs );
+     state->data.bufferSize = required;
++    LeaveCriticalSection( &state->cs );
+     if (bufferUsed) *bufferUsed = SUCCEEDED(hr) ? required : 0;
+     async_cleanup( asyncBlock );
+     return hr;

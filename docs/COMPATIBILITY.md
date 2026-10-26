@@ -14,6 +14,7 @@ Risultati di prove reali. Un gioco che funziona su un Mac può comportarsi diver
 
 | Game | Status | Engine | Tested on | Notes |
 | --- | --- | --- | --- | --- |
+| 007 First Light (Microsoft Store) | ⚠️ offline | CrossOver Preview (Rosetta) 20261015 | M5 Max · macOS 27.2 · 0.3.11-review.async-lifetime.1 | Requires CrossOver Preview **Rosetta** and a rebuilt runtime with the XAsync completion-lifetime fix (not yet in a published release). Tested with D3DMetal 4.0b3; the user confirmed gameplay. The menu reports offline; the cause is unresolved. Preview ARM/FEX still fails to launch the game. |
 | Deep Rock Galactic | ✅ | CrossOver, Highball | M1 Max · 0.3.11-mac.1 | DirectX 12 through D3DMetal. |
 | Mad King Redemption | ✅ | Highball | M1 Max · 0.3.11-mac.2 | |
 | MARVEL Cosmic Invasion | ✅ | Highball | M1 Max · 0.3.11-mac.2 | |
@@ -40,6 +41,7 @@ Risultati di prove reali. Un gioco che funziona su un Mac può comportarsi diver
 
 | Gioco | Stato | Motore | Provato su | Note |
 | --- | --- | --- | --- | --- |
+| 007 First Light (Microsoft Store) | ⚠️ offline | CrossOver Preview (Rosetta) 20261015 | M5 Max · macOS 27.2 · 0.3.11-review.async-lifetime.1 | Richiede CrossOver Preview **Rosetta** e un runtime ricompilato con la correzione della durata dei dati durante il callback di completamento XAsync (non ancora inclusa in una versione pubblicata). Provato con D3DMetal 4.0b3; l’utente ha confermato che il gioco funziona. Il menu indica offline; la causa non è ancora nota. Il gioco non si avvia ancora con Preview ARM/FEX. |
 | Deep Rock Galactic | ✅ | CrossOver, Highball | M1 Max · 0.3.11-mac.1 | DirectX 12 tramite D3DMetal. |
 | Mad King Redemption | ✅ | Highball | M1 Max · 0.3.11-mac.2 | |
 | MARVEL Cosmic Invasion | ✅ | Highball | M1 Max · 0.3.11-mac.2 | |
