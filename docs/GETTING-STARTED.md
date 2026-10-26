@@ -82,6 +82,22 @@ APFS and Mac OS Extended drives work directly. For exFAT/FAT/NTFS drives, use
 Not every game works; kernel anti-cheat games are unsupported. See the README's
 compatibility notes.
 
+### Per-game launch options
+
+In a game's **Launch tools → Launch options**, put environment assignments before
+`%command%` and extra game arguments after it, for example:
+`CX_GRAPHICS_BACKEND=dxmt %command% --launcher-skip "two words"`.
+Assignments alone also work. Quotes group literal values; variables, wildcards and
+shell commands are not expanded. Custom executable wrappers are unsupported on
+macOS and stop the launch with an error. Managed prefix and service variables
+cannot be overridden.
+
+Options apply to this launch only, without changing the shared bottle or another
+game's settings. Per-game assignments override profile defaults and inherited
+values; the **DLSS** toggle still controls its own flags, including in `CX_ENV`.
+Graphics requests only work when the selected engine supports them; requesting
+DXMT does not add missing FEX backend support.
+
 ### Updates and help
 
 Replace the app with the new `.dmg` version. Its included backend updates with
@@ -172,6 +188,22 @@ I dischi APFS e Mac OS esteso funzionano direttamente. Per exFAT/FAT/NTFS usa
 **Crea immagine APFS**. Attendi la fine dell'installazione e premi **Gioca**.
 Non tutti i giochi funzionano; gli anti-cheat a livello kernel non sono supportati.
 Consulta le note di compatibilità nel README.
+
+### Opzioni di avvio per gioco
+
+In **Strumenti di avvio → Opzioni di avvio** del gioco, inserisci le variabili prima
+di `%command%` e gli argomenti aggiuntivi dopo, per esempio:
+`CX_GRAPHICS_BACKEND=dxmt %command% --launcher-skip "due parole"`.
+Puoi anche usare solo assegnazioni di variabili. Le virgolette raggruppano valori
+letterali: variabili, caratteri jolly e comandi shell non vengono espansi. I wrapper
+eseguibili personalizzati non sono supportati su macOS e bloccano l'avvio con un
+errore. Le variabili gestite del prefisso e del servizio non sono modificabili.
+
+Le opzioni valgono solo per questo avvio, senza modificare la bottle condivisa o
+le impostazioni degli altri giochi. Le assegnazioni del gioco prevalgono sui
+profili e sui valori ereditati; l'opzione **DLSS** controlla comunque i propri flag,
+anche in `CX_ENV`. Le richieste grafiche funzionano solo se il motore scelto le
+supporta: richiedere DXMT non aggiunge il supporto backend mancante a FEX.
 
 ### Aggiornamenti e aiuto
 

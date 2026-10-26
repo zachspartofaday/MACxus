@@ -179,3 +179,14 @@ it('offers DLSS only on macOS with its requirements and per-game state', () => {
   expect(on).toContain('Also select DLSS in the game&#x27;s graphics settings');
   expect(on).toContain('Does not affect other engines');
 });
+
+
+it('explains the macOS launch-options contract without advertising custom wrappers', () => {
+  const mac = renderToStaticMarkup(<GameLaunchToolFields value={defaultLaunchTools} change={() => {}} mac />);
+  expect(mac).toContain('CX_GRAPHICS_BACKEND=dxmt %command% --launcher-skip');
+  expect(mac).toContain('shell expansion and custom wrappers are unsupported');
+  expect(mac).toContain('graphics support depends on the selected engine');
+  expect(mac).not.toContain('NAME=value and wrappers before');
+  const linux = renderToStaticMarkup(<GameLaunchToolFields value={defaultLaunchTools} change={() => {}} />);
+  expect(linux).toContain('NAME=value and wrappers before');
+});

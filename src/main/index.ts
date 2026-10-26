@@ -24,7 +24,7 @@ import { prepareMacRunner } from './mac-engine.js';
 import { macRuntimeAvailable, runtimeDllDirectory, serviceSocketPathFits, syncMacDualSenseCompatibility } from './mac-launch.js';
 import { CatalogService } from './catalog.js';
 import { cloudSaveRuntime, selectedWinePath, startXodusService, storeContentRuntime, unbridgedCloudSaveRuntime, type XodusServiceSession } from './xodus-service.js';
-import { crossOverDlssEnvironment } from './mac-dlss.js';
+import { prepareMacLaunchOptions } from './mac-launch-options.js';
 import { GameLogReducer, gameLoggingEnvironment, gameWindowEnvironment } from './game-log.js';
 import { downloadVerifiedVcRedist, installedVcRuntimeVersion, VC_REDIST_VERSION, versionAtLeast } from './vc-runtime.js';
 import { assertGameRemovalAvailable, validateGameDeleteTarget } from './game-removal.js';
@@ -1065,10 +1065,12 @@ async function prepareGameLaunch(id: string): Promise<void> {
       environment.MTL_HUD_ENABLED = '1';
       addGameLog('Metal performance HUD enabled for this game.');
     }
-    // Per-game macOS profile values (whitelisted) apply unless the user already set them.
-    for (const [key, value] of Object.entries(macProfileEnv)) if (environment[key] === undefined) environment[key] = value;
-    if (isMac) {
-      Object.assign(environment, crossOverDlssEnvironment(environment, macEngine, game.launchTools?.dlss === true));
+    if (isMac && protonRunner) {
+      const macOptions = await prepareMacLaunchOptions(protonRunner.command, game.launchTools,
+        path.join(dataRoot, 'launch-wrappers'), environment, macProfileEnv, macEngine);
+      launchWrapper = macOptions;
+      args[2] = macOptions.command;
+      Object.assign(environment, macOptions.environment);
       if (game.launchTools?.dlss) addGameLog(macEngine === 'highball'
         ? 'DLSS launch tool applies to CrossOver; the current engine is Highball.'
         : 'CrossOver DLSS support enabled for this game. Select DLSS in the game graphics settings when available.');
