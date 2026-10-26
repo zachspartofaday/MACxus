@@ -9,9 +9,10 @@ npm run compatibility:check
 ```
 
 The check also runs in source CI. GitHub renders all views as Markdown: an A–Z
-matrix with a column per compatibility layer and a detail page per game. Use the file
-outline, letter links and browser Find to navigate. The compact index has one
-row per game; test details grow on game pages rather than in the index.
+matrix with a column per compatibility layer and a detail page per game. Each
+language uses one continuous table in alphabetical order; use browser Find to
+locate a title. The compact index has one row per game; test details grow on
+game pages rather than in the index.
 
 ## One record is one configuration
 
@@ -48,7 +49,10 @@ date. Keep evidence links; do not commit raw logs, account IDs or game files.
 
 - `works`: reported working. New reports should describe actual gameplay; older
   green reports may have unknown scope. Does not imply every feature was tested.
-- `issues`: runs with reported limitations, such as offline-only play.
+- `works-offline`: working offline play, shown with a green check. Keep the
+  online limitation in `checks.online` and explain it in the summary; do not
+  infer its cause. Offline-only play alone does not make the game a warning.
+- `issues`: runs with other reported problems, such as graphics or audio issues.
 - `partial`: a limited experiment, such as startup movies or menu/controller
   input, which does not establish general gameplay compatibility.
 - `fails`: the attempted scope fails, crashes or hangs.
@@ -106,6 +110,10 @@ la connessione del controller, la versione macOS o il supporto di un chip da
 altri resoconti. Le prove limitate (`partial`) di filmati/menu/input non verificano
 il gioco completo. La data di un’issue non è automaticamente la data della prova.
 
+`works-offline` indica gioco offline funzionante con spunta verde; conserva il
+limite online nei dettagli senza dedurne la causa. Il solo limite offline non
+richiede un avviso giallo.
+
 La matrice affianca tutti i motori nella stessa riga del gioco. Mostra tutti gli
 esiti, anche discordanti; i numeri tra parentesi contano resoconti con lo stesso
 esito. Il trattino indica assenza di resoconti, non incompatibilità. I motori non
@@ -113,4 +121,5 @@ riportati restano in una colonna separata. macOS e chip sono nelle singole prove
 
 Aggiorna entrambe le lingue, esegui i comandi sopra e controlla matrice e schede. Non modificare a mano le viste generate. Non pubblicare log grezzi,
 identificativi account o file dei giochi. GitHub visualizza tutte le pagine Markdown;
-usa lettere, struttura del file e Trova nel browser per navigare.
+ogni lingua usa un’unica tabella in ordine alfabetico. Usa Trova nel browser
+per cercare un titolo.
