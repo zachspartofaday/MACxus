@@ -194,10 +194,16 @@ export interface Settings {
   macEngine?: MacEngine;
 }
 
-export type MacEngine = 'crossover' | 'highball';
+export type MacEngine = 'crossover' | 'crossover-preview' | 'crossover-preview-fex' | 'highball';
 
 /** macOS: state of the optional Highball engine. */
 export interface MacEngineStatus {
+  crossoverInstalled?: boolean;
+  crossoverVersion?: string;
+  crossoverPreviewInstalled?: boolean;
+  crossoverPreviewVersion?: string;
+  crossoverPreviewFexSupported?: boolean;
+  crossoverPreviewFexVersion?: string;
   highballInstalled: boolean;
   highballTag: string;
   installing: boolean;
@@ -405,6 +411,7 @@ export interface LauncherApi {
   updateBackend(): Promise<void>;
   rebuildBackend(): Promise<void>;
   installHighballEngine(): Promise<void>;
+  refreshMacEngines(): Promise<MacEngineStatus>;
   refreshRuntime(): Promise<RuntimeStatus>;
   checkRuntimeUpdate(): Promise<RuntimeStatus>;
   checkNexusRuntime(): Promise<RuntimeStatus>;

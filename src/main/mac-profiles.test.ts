@@ -69,6 +69,11 @@ describe('macProfileFor', () => {
 });
 
 describe('effectiveMacEngine', () => {
+  it('honors an explicit Preview edition instead of silently using a recommended engine', () => {
+    for (const setting of ['crossover-preview', 'crossover-preview-fex'] as const) {
+      expect(effectiveMacEngine(setting, { engine: 'highball', env: {} }, { highball: true })).toBe(setting);
+    }
+  });
   const both = { crossover: true, highball: true };
   it('uses the global setting without a profile, defaulting to CrossOver', () => {
     expect(effectiveMacEngine(undefined, undefined, both)).toBe('crossover');

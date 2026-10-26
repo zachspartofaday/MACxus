@@ -12,6 +12,7 @@ const api: LauncherApi = {
   updateBackend: () => ipcRenderer.invoke('backend-update'),
   rebuildBackend: () => ipcRenderer.invoke('backend-rebuild'),
   installHighballEngine: () => ipcRenderer.invoke('install-highball-engine'),
+  refreshMacEngines: () => ipcRenderer.invoke('mac-engines-refresh'),
   refreshRuntime: () => ipcRenderer.invoke('runtime-refresh'),
   checkRuntimeUpdate: () => ipcRenderer.invoke('runtime-check-update'),
   checkNexusRuntime: () => ipcRenderer.invoke('runtime-check-nexus'),

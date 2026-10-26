@@ -18,6 +18,9 @@ export interface CrossOverInstall {
   wineserver: string;
   cxbottle: string;
   version: string;
+  /** New Preview editions select their renamed server through the wine launcher. */
+  serverViaWine?: boolean;
+  supportsArm64?: boolean;
 }
 
 type Graphics = 'd3dmetal' | 'dxmt' | 'wined3d';
@@ -29,25 +32,56 @@ export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+export function crossOverCandidateRoots(edition: 'standard' | 'preview' | 'preview-fex', home = os.homedir()): string[] {
+  const apps = edition === 'preview-fex' ? ['CrossOver PreviewARM.app', 'CrossOver Preview ARM64.app', 'CrossOver Preview ARM.app', 'CrossOver Preview.app']
+    : [edition === 'preview' ? 'CrossOver Preview.app' : 'CrossOver.app'];
+  return ['/Applications', path.join(home, 'Applications')].flatMap(dir => apps.map(app => path.join(dir, app, 'Contents/SharedSupport/CrossOver')));
+}
+
+export function findCrossOverPreview(candidates = crossOverCandidateRoots('preview')): Promise<CrossOverInstall | undefined> {
+  return findCrossOver(candidates);
+}
+
+export async function findCrossOverPreviewFex(candidates = crossOverCandidateRoots('preview-fex')): Promise<CrossOverInstall | undefined> {
+  for (const root of candidates) {
+    const installation = await findCrossOver([root]);
+    if (installation?.supportsArm64) return installation;
+  }
+  return undefined;
+}
+
 export async function findCrossOver(candidates?: string[]): Promise<CrossOverInstall | undefined> {
-  const roots = candidates ?? [
-    '/Applications/CrossOver.app/Contents/SharedSupport/CrossOver',
-    path.join(os.homedir(), 'Applications/CrossOver.app/Contents/SharedSupport/CrossOver'),
-  ];
+  const roots = candidates ?? crossOverCandidateRoots('standard');
   for (const root of roots) {
     const wine = path.join(root, 'bin', 'wine');
-    const wineserver = path.join(root, 'bin', 'wineserver');
+    let wineserver = path.join(root, 'bin', 'wineserver');
     const cxbottle = path.join(root, 'bin', 'cxbottle');
     try {
-      await Promise.all([wine, wineserver, cxbottle].map((file) => fs.access(file, constants.X_OK)));
+      await Promise.all([wine, cxbottle].map((file) => fs.access(file, constants.X_OK)));
     } catch { continue; }
+    let serverViaWine = false;
+    try { await fs.access(wineserver, constants.X_OK); }
+    catch {
+      const servers = [path.join(root, 'bin/wineserver-x86'), path.join(root, 'bin/wineserver-arm64')];
+      const available = await Promise.all(servers.map(async file => { try { await fs.access(file, constants.X_OK); return file; } catch { return undefined; } }));
+      const server = available.find(Boolean);
+      if (!server) continue;
+      wineserver = server; serverViaWine = true;
+    }
+    let supportsArm64 = false;
+    try {
+      await fs.access(path.join(root, 'bin/wineserver-arm64'), constants.X_OK);
+      await fs.access(path.join(root, 'lib/wine/aarch64-unix/ntdll.so'));
+      await fs.access(path.join(root, 'lib/wine/aarch64-unix/libarm64ecfex.so'));
+      supportsArm64 = true;
+    } catch { /* This edition has no FEX/ARM engine. */ }
     let version = '';
     try {
       const plist = path.join(root, '..', '..', 'Info.plist');
       const result = await run('plutil', ['-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', plist]);
       if (result.code === 0) version = result.output.trim();
     } catch { /* version stays unknown */ }
-    return { root, wine, wineserver, cxbottle, version };
+    return { root, wine, wineserver, cxbottle, version, ...(serverViaWine ? { serverViaWine } : {}), ...(supportsArm64 ? { supportsArm64 } : {}) };
   }
   return undefined;
 }
@@ -61,18 +95,19 @@ export function stripBuiltinMarker(bytes: Buffer): Buffer {
 
 export function crossOverWrapperScript(cx: CrossOverInstall, bottlesRoot: string, bottle: string, graphics: Graphics): string {
   const prefix = path.join(bottlesRoot, bottle);
+  const server = cx.serverViaWine ? `${shellQuote(cx.wine)} --bottle ${shellQuote(bottle)} --ux-app wineserver` : shellQuote(cx.wineserver);
   return [
     '#!/bin/sh',
     `export CX_BOTTLE_PATH=${shellQuote(bottlesRoot)}`,
     `export CX_GRAPHICS_BACKEND="\${CX_GRAPHICS_BACKEND:-${graphics}}"`,
     `export WINEPREFIX=${shellQuote(prefix)}`,
     'if [ "${1:-}" = "--nexus-stop-prefix" ]; then',
-    `  exec ${shellQuote(cx.wineserver)} -k`,
+    `  exec ${server} -k`,
     'fi',
     'launch_status=0',
     `${shellQuote(cx.wine)} --bottle ${shellQuote(bottle)} "$@" || launch_status=$?`,
     'wait_status=0',
-    `${shellQuote(cx.wineserver)} -w || wait_status=$?`,
+    `${server} -w || wait_status=$?`,
     'if [ "$launch_status" -ne 0 ]; then exit "$launch_status"; fi',
     'exit "$wait_status"',
     '',
@@ -181,15 +216,16 @@ export async function prepareCrossOverRunner(
   runtimeDlls: string | RuntimeDllSource,
   graphics: Graphics = 'd3dmetal',
   log: (line: string) => void = () => undefined,
+  architecture: 'win64' | 'arm64' = 'win64',
 ): Promise<ProtonRunner> {
   const bottlePath = path.join(bottlesRoot, BOTTLE);
-  const env = { ...process.env, CX_BOTTLE_PATH: bottlesRoot };
+  const env = { ...process.env, CX_BOTTLE_PATH: bottlesRoot, WINEPREFIX: bottlePath };
   await fs.mkdir(bottlesRoot, { recursive: true });
 
   let existed = true;
   try { await fs.access(path.join(bottlePath, 'system.reg')); } catch { existed = false; }
   if (!existed) {
-    const created = await run(cx.cxbottle, ['--bottle', BOTTLE, '--create', '--template', 'win10_64'], { env });
+    const created = await run(cx.cxbottle, ['--bottle', BOTTLE, '--create', '--template', 'win10_64', ...(architecture === 'arm64' ? ['--winearch', 'arm64'] : [])], { env });
     try { await fs.access(path.join(bottlePath, 'system.reg')); } catch {
       throw new Error(`The CrossOver bottle was not created: ${created.output.trim().split('\n').slice(-3).join(' | ') || `code ${created.code}`}`);
     }

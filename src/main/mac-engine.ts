@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { MacEngine } from '../shared/types.js';
-import { bundledRuntimeDllDirectory, findCrossOver, prepareCrossOverRunner, runtimeOverrideDirectory, type CrossOverInstall, type RuntimeDllSource } from './crossover.js';
+import { bundledRuntimeDllDirectory, findCrossOver, findCrossOverPreview, findCrossOverPreviewFex, prepareCrossOverRunner, runtimeOverrideDirectory, type CrossOverInstall, type RuntimeDllSource } from './crossover.js';
 import { highballEngineInstalled, highballOverrideDirectory, prepareHighballRunner } from './highball-engine.js';
 import { CROSSOVER_MISSING } from './mac-launch.js';
 import { effectiveMacEngine, loadMacProfiles, macProfileFor, type MacProfiles } from './mac-profiles.js';
@@ -20,16 +20,20 @@ export function appleGptkRoot(cx: CrossOverInstall | undefined): string {
 
 export interface MacRunnerDeps {
   findCrossOver: () => Promise<CrossOverInstall | undefined>;
+  findCrossOverPreview?: () => Promise<CrossOverInstall | undefined>;
+  findCrossOverPreviewFex?: () => Promise<CrossOverInstall | undefined>;
   highballInstalled: (dataRoot: string) => string | undefined;
-  prepareCrossOver: (cx: CrossOverInstall, bottlesRoot: string, runtimeDlls: RuntimeDllSource, log: (line: string) => void) => Promise<ProtonRunner>;
+  prepareCrossOver: (cx: CrossOverInstall, bottlesRoot: string, runtimeDlls: RuntimeDllSource, log: (line: string) => void, architecture?: 'win64' | 'arm64') => Promise<ProtonRunner>;
   prepareHighball: (engineRoot: string, appleGptk: string, crossOverLib64: string, bottlesRoot: string, runtimeDlls: RuntimeDllSource, extraEnv: Record<string, string>, log: (line: string) => void, engineOverrideDir: string) => Promise<ProtonRunner>;
   profiles: () => Promise<MacProfiles>;
 }
 
 const defaultDeps: MacRunnerDeps = {
   findCrossOver: () => findCrossOver(),
+  findCrossOverPreview: () => findCrossOverPreview(),
+  findCrossOverPreviewFex: () => findCrossOverPreviewFex(),
   highballInstalled: (dataRoot) => highballEngineInstalled(dataRoot),
-  prepareCrossOver: (cx, bottlesRoot, runtimeDlls, log) => prepareCrossOverRunner(cx, bottlesRoot, runtimeDlls, 'd3dmetal', log),
+  prepareCrossOver: (cx, bottlesRoot, runtimeDlls, log, architecture) => prepareCrossOverRunner(cx, bottlesRoot, runtimeDlls, 'd3dmetal', log, architecture),
   prepareHighball: prepareHighballRunner,
   profiles: () => loadMacProfiles(),
 };
@@ -56,9 +60,11 @@ export interface MacRunner {
  */
 export async function prepareMacRunner(request: MacRunnerRequest, deps: MacRunnerDeps = defaultDeps): Promise<MacRunner> {
   const profile = macProfileFor(await deps.profiles(), request.storeId);
-  const crossOver = await deps.findCrossOver();
+  const [stable, preview, previewFex] = await Promise.all([deps.findCrossOver(), deps.findCrossOverPreview?.(), deps.findCrossOverPreviewFex?.()]);
   const highball = deps.highballInstalled(request.dataRoot);
-  const engine = effectiveMacEngine(request.setting, profile, { crossover: Boolean(crossOver), highball: Boolean(highball) });
+  const engine = effectiveMacEngine(request.setting, profile, { crossover: Boolean(stable), 'crossover-preview': Boolean(preview), 'crossover-preview-fex': Boolean(previewFex?.supportsArm64), highball: Boolean(highball) });
+  const isPreview = engine === 'crossover-preview' || engine === 'crossover-preview-fex';
+  const crossOver = engine === 'crossover-preview-fex' ? previewFex : isPreview ? preview : stable;
   const profileEnv = { ...(profile?.env ?? {}) };
   const bottlesRoot = path.join(request.dataRoot, 'bottles');
   const runtimeDlls: RuntimeDllSource = { dir: request.runtimeDllDir, overrideDir: runtimeOverrideDirectory(request.dataRoot), bundledDir: await bundledRuntimeDllDirectory(request.runtimeDllDir) };
@@ -72,7 +78,11 @@ export async function prepareMacRunner(request: MacRunnerRequest, deps: MacRunne
     request.log(`Motore Wine: Highball (${highball}); D3DMetal da ${gptk}; ${profileText}.`);
     return { runner: await deps.prepareHighball(highball, gptk, path.join(crossOver!.root, 'lib64'), bottlesRoot, runtimeDlls, profileEnv, request.log, highballOverrideDirectory(request.dataRoot)), engine, profileEnv };
   }
-  if (!crossOver) throw new Error(CROSSOVER_MISSING);
-  request.log(`Motore Wine: CrossOver ${crossOver.version || ''}`.trimEnd() + `; ${profileText}.`);
-  return { runner: await deps.prepareCrossOver(crossOver, bottlesRoot, runtimeDlls, request.log), engine, profileEnv };
+  if (!crossOver) throw new Error(engine === 'crossover-preview-fex' ? 'CrossOver FEX/ARM Preview was not found. Install the ARM64 edition or choose another Wine engine.' : isPreview ? 'CrossOver Preview was not found. Install it in Applications or choose another Wine engine.' : CROSSOVER_MISSING);
+  if (engine === 'crossover-preview-fex' && !crossOver.supportsArm64) throw Error('This CrossOver Preview installation does not include the FEX/ARM engine.');
+  const label = engine === 'crossover-preview-fex' ? 'CrossOver Preview (FEX/ARM)' : isPreview ? 'CrossOver Preview (Rosetta)' : 'CrossOver';
+  request.log(`Motore Wine: ${label} ${crossOver.version || ''}`.trimEnd() + `; ${profileText}.`);
+  // Preview must never upgrade the user's regular CrossOver bottle in place.
+  const selectedBottles = isPreview ? path.join(request.dataRoot, engine === 'crossover-preview-fex' ? 'bottles-crossover-preview-fex' : 'bottles-crossover-preview') : bottlesRoot;
+  return { runner: await deps.prepareCrossOver(crossOver, selectedBottles, runtimeDlls, request.log, engine === 'crossover-preview-fex' ? 'arm64' : 'win64'), engine, profileEnv };
 }
