@@ -49,6 +49,32 @@ describe('appleGptkRoot', () => {
 });
 
 describe('prepareMacRunner', () => {
+  it('routes a Halo pack through its own engine and prefix for launch and prerequisite setup', async () => {
+    const stable = await crossOverWithGptk(await tmp()), preview = await crossOverWithGptk(await tmp());
+    const packed = { ...preview, wine: '/private-pack/bin/wine' };
+    const options = deps(stable, undefined, []);
+    options.findCrossOverPreview = async () => preview;
+    options.profiles = async () => ({ '9N683TDT5M7R': { engine: 'crossover-preview', env: {} } });
+    const selected: unknown[] = [], configured: string[] = [];
+    options.prepareCompatibility = async request => {
+      if (request.storeId !== '9N683TDT5M7R') return undefined;
+      expect(request.installation).toBe(preview);
+      return { installation: packed, bottlesRoot: '/private-pack/bottles', environment: { MACXUS_MF_SOFTWARE_OUTPUT: '1' }, configurePrefix: async prefix => { configured.push(prefix); } };
+    };
+    options.prepareCrossOver = async (cx, bottles) => {
+      selected.push([cx, bottles]); return { command: `${bottles}/runner`, compatibilityDataPath: `${bottles}/xbox` };
+    };
+    const request = { setting: 'crossover' as const, storeId: '9N683TDT5M7R', dataRoot: '/d', runtimeDllDir: '/dll', log: () => {} };
+    for (let i = 0; i < 2; i++) {
+      const result = await prepareMacRunner(request, options);
+      expect(result.profileEnv).toEqual({ MACXUS_MF_SOFTWARE_OUTPUT: '1' });
+      expect(result.runner.compatibilityDataPath).toBe('/private-pack/bottles/xbox');
+    }
+    expect(selected).toEqual([[preview, '/private-pack/bottles'], [packed, '/private-pack/bottles'], [preview, '/private-pack/bottles'], [packed, '/private-pack/bottles']]);
+    expect(configured).toEqual(['/private-pack/bottles/xbox', '/private-pack/bottles/xbox']);
+    const other = await prepareMacRunner({ ...request, storeId: 'another-game' }, options);
+    expect(other.profileEnv).toEqual({}); expect(selected.at(-1)).toEqual([stable, '/d/bottles']);
+  });
   it('selects the separate FEX app and asks for an ARM64 bottle, independently of regular Preview', async () => {
     const stable = await crossOverWithGptk(await tmp()), preview = await crossOverWithGptk(await tmp());
     const arm = { ...await crossOverWithGptk(await tmp()), supportsArm64: true };

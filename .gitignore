@@ -28,3 +28,6 @@ bundled/
 docs/internal/
 *.backup-*
 *.tmp*
+
+# Generated Halo compatibility pack source archive (prepared during macOS packaging)
+/assets/compatibility-packs/halo-preview-media-v1/source/

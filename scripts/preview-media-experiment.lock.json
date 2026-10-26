@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "experimental-source-only",
+  "status": "experimental-game-specific-pack",
   "engine": {
     "displayVersion": "20261015",
     "internalVersion": "27.0.0.41073",
@@ -51,18 +51,21 @@
     "graphics": "D3DMetal",
     "startupMovies": "picture and audio confirmed by user",
     "laterCinematics": "not verified",
-    "pacing": "some stutter reported; verbose diagnostics enabled",
+    "pacing": "user reports smoother playback with minimal logging",
     "directH264Probe": {
       "inputPackets": 90,
       "outputFrames": 90,
       "output2DBuffers": 90,
       "errors": 0
     },
-    "fileDecoderProbesPassed": 4
+    "fileDecoderProbesPassed": 4,
+    "automaticPack": "startup movie picture/audio confirmed by user"
   },
   "distribution": {
-    "bundledBinaries": false,
-    "automaticInstallation": false,
-    "winevideoLicenseConfirmation": "pending per docs/THIRD_PARTY.md"
+    "generatedBinariesCommitted": false,
+    "bundledByMacPackaging": true,
+    "automaticGameScopedPreparation": true,
+    "winevideoLicense": "LGPL per author documentation",
+    "licenseDocumentation": "https://github.com/Jfishin/winevideo/wiki/Building-and-Patch-Provenance#licensing-and-attribution"
   }
 }

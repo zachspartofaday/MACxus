@@ -2,13 +2,36 @@
 
 Halo: Campaign Evolved (`9N683TDT5M7R`) played startup movies with picture and
 sound using this source patch in a separate **CrossOver Preview Rosetta
-20261015** engine and disposable bottle. Some stutter was reported with verbose
-diagnostics enabled. Later cinematics and playback with minimal logging still
-need testing. This does not establish compatibility with FEX/ARM Preview.
+20261015** engine and disposable bottle. The automatic-pack test also had picture/audio, and the user reported smoother
+playback with minimal logging. Later cinematics still need testing. This does not establish compatibility with FEX/ARM Preview.
 
-This patches Wine's Media Foundation decoder, not Halo's executable or media.
-It is a maintainer experiment, not a launcher feature or a distributed runtime.
-No default game profile, shared bottle or installed CrossOver is changed.
+## Automatic compatibility pack
+
+macOS distribution builds include the two verified Wine DLLs, their LGPL license,
+complete original source archive and source patch. Users do not need compilers
+or manual engine/configuration edits. On Halo's first launch, MACxus verifies the
+installed Preview build and prepares a locally signed engine copy and a dedicated
+Halo bottle under its application data. Bottle initialization uses unmodified
+Preview first; the patched engine is selected for game execution after setup. The game profile recommends Preview
+Rosetta when it is installed; an explicit FEX selection remains respected.
+
+The pack is selected by Halo's Store ID, never by the title or folder name. Only
+that launch receives the software-output setting and only that bottle receives
+the Electra configuration. Stable CrossOver, FEX and other games keep their normal
+runners. The installed CrossOver app, shared bottles and game files are not
+modified. The dedicated bottle has its own game settings/save locations; existing
+shared-bottle saves are not migrated by this feature. Normal Xodus cloud-save
+behavior still depends on the active runtime and account.
+
+Unrecognized Preview versions/build tags use the normal selected engine with an
+explanation in the launch log. Modified vendor DLLs, corrupt pack components or
+an invalid signature stop preparation with an error instead of executing an
+unverified copy. Ordinary source checkouts without generated payloads keep using
+the selected engine; packaged builds verify the pack is complete.
+
+The media patch changes Wine's decoder, not Halo's executable or movie files.
+This remains an experimental compatibility feature; the same limitations on
+later cinematics, FEX and playback pacing apply.
 
 ## Supported experiment
 
@@ -27,7 +50,22 @@ Without the opt-in, the patched decoder retains its base-source format and
 D3D-awareness behavior. This is not proof that every other media interface
 matches Preview; keep the experiment isolated to Halo.
 
-## Rebuild
+## Maintainer build preparation
+
+`npm run dist:mac` runs `npm run prepare:mac-media-pack` automatically. The latter
+downloads the checksum-pinned source archive, applies and verifies the patch,
+builds the two PE DLLs and requires the accepted output hashes. The build sets
+`SOURCE_DATE_EPOCH` separately for each DLL using the recorded tested timestamps.
+Generated DLLs and the source archive remain ignored by Git, and the actual app
+ASAR is checked for both DLLs, the complete source archive and the LGPL license.
+A different toolchain that produces different bytes requires candidate
+revalidation and a manifest update; packaging never accepts it silently.
+
+For a cached official source archive, add `-- --source-archive /path/to/archive`
+to the preparation command. Maintainers may reuse an exact accepted build with
+`--dll-dir /path/to/dlls`; both hashes are checked before payload files change.
+
+### Manual source reproduction
 
 Use macOS with Xcode command-line tools, GNU Bison 3.8 or later, GNU Make and
 MinGW-w64's `x86_64-w64-mingw32-strip`. Homebrew Bison is keg-only, so put its
@@ -99,10 +137,16 @@ passed for the logo and opening-cinematic files with the opt-in on and off. The
 full game test exited cleanly, and the user confirmed picture and audio. Raw
 logs, movie packets, prefixes and game files are intentionally not committed.
 
-## Distribution boundary
+## Source and attribution
 
-No rebuilt DLL or vendor application is committed or automatically installed.
-The existing winevideo license-confirmation requirement in
-[THIRD_PARTY.md](THIRD_PARTY.md#winevideo-patches) still applies. A packaged,
-game-scoped delivery mechanism, exact Preview source compatibility, minimal-log
-pacing and later cinematics remain separate work before general distribution.
+Wine's LGPL license is included in the pack. The winevideo author documents that
+Wine-derived source changes and DLLs follow Wine's LGPL terms; see
+[THIRD_PARTY.md](THIRD_PARTY.md#winevideo-patches). The complete original source
+archive is shipped alongside the generated DLLs, and this repository provides
+the exact patch and build instructions. CrossOver itself, game files and optional
+third-party media frameworks are not distributed by this pack.
+
+Exact Preview source compatibility outside the tested interfaces and later
+cinematics remain unverified. The automatic launcher path passed a minimal-log startup-movie test with user
+confirmation of picture/audio and smoother playback. This is not a stable
+release claim or validation of every cinematic.

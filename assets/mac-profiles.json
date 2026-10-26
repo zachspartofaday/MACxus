@@ -16,5 +16,10 @@
       "D3DM_DEVICE_DESCRIPTION": "NVIDIA GeForce RTX 4070"
     },
     "note": "Profilo da highball-db (CC0)"
+  },
+  "9N683TDT5M7R": {
+    "engine": "crossover-preview",
+    "env": {},
+    "note": "Halo movie compatibility: CrossOver Preview Rosetta"
   }
 }
