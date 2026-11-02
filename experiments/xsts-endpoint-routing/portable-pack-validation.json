@@ -50,7 +50,7 @@
   "livePortablePackValidation": false,
   "comparison": "The earlier private broader control achieved user-reported online success; this tighter candidate was not launched in a game.",
   "currentUserSession": "Not stopped or relaunched during packaging work",
-  "independentReview": "Exact 81a5f90 recheck found no new actionable findings; CI recipe follow-up awaiting separate recheck",
+  "independentReview": "81a5f90 passed. c9dd5c9 recheck found one P2 cleanup ownership issue; new inventory-only grace and regressions awaiting fresh recheck.",
   "publication": "No upstream submission; no installation or merge",
   "credentialRegressionLoopback": {
     "exitCode": 0,
@@ -81,7 +81,15 @@
   "buildFollowUp": {
     "rebuildArgumentDispatchedToBothPackBuilders": true,
     "runtimeRebuildSkipsPayloadCache": true,
-    "detachRace": "bounded retries while authoritative inventory still lists image; never force detach or remove a mounted image",
-    "gameLaunched": false
+    "detachRace": "After a missing-mount error, poll authoritative inventory only; reject foreign mountpoint ownership; require owned-image absence before success; never force detach",
+    "gameLaunched": false,
+    "cleanupOwnershipRegressions": "Foreign occupant present immediately or appearing during grace, with owned image present or absent: all rejected, no second detach",
+    "focusedTestsPassed": 14,
+    "ciTools": {
+      "passed": 90,
+      "skipped": 1,
+      "failed": 0
+    },
+    "liveOwnedAPFSCleanupSmoke": "passed normal and already-detached paths"
   }
 }

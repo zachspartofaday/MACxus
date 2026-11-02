@@ -91,7 +91,7 @@ test('missing mountpoint with a disappearing backing image gets bounded cleanup 
   await detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => file, run, wait: async ms => waits.push(ms), log: () => {} });
   assert.deepEqual(waits, [250, 500]);
   assert.equal(inventories, 3);
-  assert.equal(calls.filter(([, args]) => args[0] === 'detach').length, 3);
+  assert.equal(calls.filter(([, args]) => args[0] === 'detach').length, 1);
 });
 
 test('persistent missing-mount inventory never removes or force-detaches the image', async () => {
@@ -99,9 +99,36 @@ test('persistent missing-mount inventory never removes or force-detaches the ima
   const waits = [];
   await assert.rejects(detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => file, run, wait: async ms => waits.push(ms), log: () => {} }), error => error.status === 1);
   assert.deepEqual(waits, [250, 500, 1000, 2000]);
-  assert.equal(calls.filter(([, args]) => args[0] === 'detach').length, 5);
+  assert.equal(calls.filter(([, args]) => args[0] === 'detach').length, 1);
   assert.ok(calls.every(([tool]) => ['hdiutil', 'plutil'].includes(tool)));
   assert.ok(!JSON.stringify(calls).includes('force'));
+});
+
+test('foreign mountpoint ownership never triggers another detach or permits owned-image deletion', async () => {
+  for (const foreignAppearsAfter of [0, 1]) {
+    for (const ownedStillListed of [true, false]) {
+      let inventories = 0, detaches = 0;
+      const waits = [];
+      const run = (tool, args) => {
+        if (args[0] === 'detach') {
+          detaches++;
+          // A second detach would succeed on the foreign image. It must never
+          // occur, even when ownership changes during the inventory grace.
+          if (detaches === 1) throw gone();
+          return '';
+        }
+        if (tool === 'hdiutil') return '<plist>inventory</plist>';
+        const foreign = inventories++ >= foreignAppearsAfter;
+        return JSON.stringify([
+          ...(!foreign || ownedStillListed ? [{ 'image-path': '/fixture.sparseimage', 'system-entities': [] }] : []),
+          ...(foreign ? [{ 'image-path': '/foreign.sparseimage', 'system-entities': [{ 'mount-point': '/fixture' }] }] : []),
+        ]);
+      };
+      await assert.rejects(detachMacTestVolume('/fixture', { imagePath: '/fixture.sparseimage', canonical: async file => file, run, wait: async ms => waits.push(ms), log: () => {} }), error => error.status === 1);
+      assert.equal(detaches, 1);
+      assert.equal(waits.length, foreignAppearsAfter);
+    }
+  }
 });
 
 test('unrelated RAM images do not require filesystem identity resolution', async () => {
