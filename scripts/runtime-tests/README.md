@@ -303,3 +303,7 @@ malformed/unrequested/duplicate catalog rows, action/kind filtering, package
 metadata, cancellation before and during worker execution, failure propagation,
 identity separation, one-shot result transfer, stale proof and closing a query
 from its enumeration callback. No live account or catalog fixture is needed.
+
+Mixed-SKU pricing fixtures exercise both SKU orders with paid and genuinely free
+Purchase offers. A Details/Redeem listing must not mask the Purchase display
+price; price magnitude is not used as an ownership or Purchase signal.

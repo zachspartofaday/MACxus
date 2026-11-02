@@ -28,6 +28,22 @@ static void query_parser_tests(void)
         CHECK("actual-catalog-availability",p->skus[0].availabilitiesCount==1 && !strcmp(p->skus[0].availabilities[0].availabilityId,"A1"));
         entitled_snapshot_release(snapshot);
     }
+    /* Display pricing must prefer Purchase across SKU ordering, including
+     * real free purchases rather than inferring preference from price > 0. */
+    {
+        const char *mixed[] = {"details-before-purchase", "purchase-before-details",
+            "details-before-free-purchase", "free-purchase-before-details"};
+        for (UINT i = 0; i < ARRAY_SIZE(mixed); i++)
+        {
+            CHECK("mixed-sku-query", catalog_fixture(mixed[i], &context, NULL, 0, expiry, &snapshot) == S_OK && snapshot && snapshot->count == 1);
+            if (snapshot)
+            {
+                CHECK("purchase-price-across-skus", snapshot->products[0].price.price == (i < 2 ? 10 : 0) &&
+                    snapshot->products[0].price.basePrice == (i < 2 ? 20 : 0));
+                entitled_snapshot_release(snapshot);
+            }
+        }
+    }
     CHECK("owned-exact-sku",catalog_fixture("two-skus",&context,&license,1,expiry,&snapshot)==S_OK && snapshot && snapshot->count==1);
     if(snapshot){
         CHECK("one-sku-owned-not-all",snapshot->products[0].isInUserCollection && snapshot->products[0].skus[0].isInUserCollection && !snapshot->products[0].skus[1].isInUserCollection && snapshot->products[0].skus[1].isTrial);

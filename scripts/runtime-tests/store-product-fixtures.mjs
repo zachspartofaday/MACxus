@@ -21,6 +21,23 @@ export function storeProductFixtures() {
   change('unknown-type', p => { p.ProductType = 'Other'; });
   change('two-skus', p => { const second = structuredClone(sku); second.Sku.SkuId = '0011'; second.Sku.Properties.IsTrial = true; p.DisplaySkuAvailabilities.push(second); });
   change('delisted', p => { const a = p.DisplaySkuAvailabilities[0].Availabilities[0]; a.Actions = ['Details', 'Redeem']; a.OrderManagementData.Price.ListPrice = a.OrderManagementData.Price.MSRP = 0; });
+  for (const [name, detailsFirst, freePurchase] of [
+    ['details-before-purchase', true, false], ['purchase-before-details', false, false],
+    ['details-before-free-purchase', true, true], ['free-purchase-before-details', false, true],
+  ]) {
+    change(name, p => {
+      const details = structuredClone(sku), purchase = structuredClone(sku);
+      details.Sku.SkuId = '0011';
+      details.Availabilities[0].Actions = ['Details', 'Redeem'];
+      details.Availabilities[0].OrderManagementData.Price.ListPrice = freePurchase ? 10 : 0;
+      details.Availabilities[0].OrderManagementData.Price.MSRP = freePurchase ? 20 : 0;
+      if (freePurchase) {
+        purchase.Availabilities[0].OrderManagementData.Price.ListPrice = 0;
+        purchase.Availabilities[0].OrderManagementData.Price.MSRP = 0;
+      }
+      p.DisplaySkuAvailabilities = detailsFirst ? [details, purchase] : [purchase, details];
+    });
+  }
   return fixtures;
 }
 

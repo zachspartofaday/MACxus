@@ -482,3 +482,7 @@ Its successful async cases substitute only network work with synthetic data.
 This source increment excludes add-on inventory, purchase/download APIs, the
 private Python bridge and runtime release/promotion. Full live service/game
 validation of this extracted increment remains separate.
+
+Product display pricing prefers an available Purchase offer across SKUs, even
+when a Details/Redeem-only SKU appears first. A genuinely free Purchase remains
+zero-priced; the preference follows the action rather than a nonzero price.

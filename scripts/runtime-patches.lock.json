@@ -214,7 +214,7 @@
     },
     {
       "file": "assets/xgameruntime-store-products.patch",
-      "sha256": "d59e0ee8e70ef3a485d29a969761df3f30d6bf20c67965d3ff62876c6d4dc324"
+      "sha256": "963d4731afe29fc8568c2afc93560b5fb382a0e5d1bf708b2d50d7288def1179"
     }
   ],
   "expectedWineSources": {
@@ -260,7 +260,7 @@
     "dlls/xgameruntime/xstore_game_license.h": "8bcc2fd256c3e08ba59d9d5211ffb6f70e01a95cef6d0272ddf61bb8d284bffb",
     "dlls/xgameruntime/xpackage_chunks.h": "fb803b48df7f31f593e607b3662c1299d3f0247a0b6a5c845b8405b0df0a41bf",
     "dlls/xgameruntime/xpackage_monitors.h": "0ee4bf63bee0c907e395fa2bf347cf2634dd9960c7f08e8e84d92a6be1b8b86e",
-    "dlls/xgameruntime/xstore_products.h": "2f7bfe7c8d3044112ad1facb4b050e93f5f744586e70aaf7e72f8bdf7b6f19e3"
+    "dlls/xgameruntime/xstore_products.h": "74a4c55ae0c90802066eedc58375ee75b98e0da0ad6cd4f8831c8dca56352b7d"
   },
   "runtimeCompatibilitySources": {
     "scripts/runtime-compat/build.mjs": "ac150747020a3a29d1d436c2e2af879e66ea2fe9104d4d330534d6128ba3ea19",

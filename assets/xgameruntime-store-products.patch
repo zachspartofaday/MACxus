@@ -71,7 +71,7 @@
  
 --- /dev/null
 +++ b/dlls/xgameruntime/xstore_products.h
-@@ -0,0 +1,456 @@
+@@ -0,0 +1,463 @@
 +/* SPDX-License-Identifier: LGPL-2.1-or-later
 + * Explicit catalog queries. Public catalog data never grants ownership;
 + * collection flags require an exact SKU in a verified licensing receipt.
@@ -184,7 +184,7 @@
 +/* All pointers returned here are owned by the snapshot. Only current
 + * availabilities matching requested actions are exposed. Empty action filters
 + * still return delisted products, with no fabricated purchasable availability. */
-+static HRESULT products_availabilities( IJsonObject *entry, UINT32 filters, XStoreSku *sku, BOOL *matches )
++static HRESULT products_availabilities( IJsonObject *entry, UINT32 filters, XStoreSku *sku, BOOL *matches, BOOL *purchase_price )
 +{
 +    IJsonArray *array = NULL;
 +    IJsonObject *row = NULL, *conditions = NULL;
@@ -193,6 +193,7 @@
 +    INT64 begin, until, now = time(NULL);
 +    HRESULT hr = E_UNEXPECTED;
 +    *matches = !filters;
++    *purchase_price = FALSE;
 +    if (FAILED(receipt_get_array(entry, L"Availabilities", &array)) ||
 +        FAILED(receipt_array_size(array, &count)) || count > PRODUCTS_MAX_AVAILABILITIES) goto done;
 +    if (count && !(sku->availabilities = calloc(count, sizeof(*sku->availabilities)))) { hr = E_OUTOFMEMORY; goto done; }
@@ -221,6 +222,7 @@
 +                sku->price = target->price;
 +                sku->price.currencyCode = strdup(target->price.currencyCode);
 +                if (!sku->price.currencyCode) { hr = E_OUTOFMEMORY; goto done; }
++                *purchase_price = !!(mask & 1);
 +            }
 +        }
 +        free(id); id = NULL; free(start); start = NULL; free(end); end = NULL;
@@ -250,7 +252,7 @@
 +    char *type = NULL, *id = NULL, *sku_id = NULL;
 +    UINT32 count, i, j, package_count;
 +    boolean trial;
-+    BOOL matches;
++    BOOL matches, purchase_price, product_purchase_price = FALSE;
 +    HRESULT hr = E_UNEXPECTED;
 +    *include = FALSE;
 +    id = receipt_string(row, L"ProductId", 12); type = receipt_string(row, L"ProductType", 32);
@@ -300,12 +302,17 @@
 +            target->isInUserCollection = out->isInUserCollection = TRUE;
 +            target->collectionData.endDate = license->expiry; target->collectionData.isTrial = trial;
 +        }
-+        if (FAILED(hr = products_availabilities(entry, context->actions, target, &matches))) goto done;
++        if (FAILED(hr = products_availabilities(entry, context->actions, target, &matches, &purchase_price))) goto done;
 +        if (matches) *include = TRUE;
-+        if (!out->price.currencyCode && target->price.currencyCode)
++        /* Prefer a Purchase price across SKUs as well as within a SKU.
++         * A real free Purchase still outranks a paid Details/Redeem listing. */
++        if (target->price.currencyCode && (!out->price.currencyCode || (purchase_price && !product_purchase_price)))
 +        {
-+            out->price = target->price; out->price.currencyCode = strdup(target->price.currencyCode);
-+            if (!out->price.currencyCode) { hr = E_OUTOFMEMORY; goto done; }
++            char *currency = strdup(target->price.currencyCode);
++            if (!currency) { hr = E_OUTOFMEMORY; goto done; }
++            free((char *)out->price.currencyCode);
++            out->price = target->price; out->price.currencyCode = currency;
++            product_purchase_price = purchase_price;
 +        }
 +        IJsonObject_Release(sku_properties); sku_properties = NULL;
 +        IJsonObject_Release(sku); sku = NULL; IJsonObject_Release(entry); entry = NULL;
