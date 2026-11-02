@@ -294,3 +294,12 @@ Current-package readiness regressions also reject root-level FileGroups, unknown
 payload containers, FileGroups inside Features, and nested payload under Feature.
 These cases accompany a valid chunk so silently skipping the invalid declaration
 would produce a detectable false readiness result.
+
+`store-products-probe.exe` adds explicit product-query regressions using the
+production `xstore_products.h` and cleanup helpers. `build-store-probes.mjs`
+generates and embeds synthetic JSON fixtures, so probes run from any working
+directory. Cases cover unowned public listings, exact-SKU ownership/expiry,
+malformed/unrequested/duplicate catalog rows, action/kind filtering, package
+metadata, cancellation before and during worker execution, failure propagation,
+identity separation, one-shot result transfer, stale proof and closing a query
+from its enumeration callback. No live account or catalog fixture is needed.
