@@ -69,6 +69,10 @@ The runtime does not provide a unique platform device identifier.
   validation through the real package ABI. Already-installed chunks need no
   reordering; empty package identifiers are rejected, not treated as the current
   package. These checks do not establish a title's startup compatibility.
+  Current-package regressions also cover build-machine SourcePath relocation via
+  DestinationPath, a layout over 1 MiB, missing payload, traversal/empty/duplicate
+  layouts, and a crowded sibling-discovery root. The current package must remain
+  ready while unknown or unrelated package discovery still enforces its bounds.
   Uses only synthetic files in a disposable prefix, without accounts or licensing.
   File presence checks are not a full package-integrity or ownership verification.
 - `package-legacy-probe.c`: independent raw x64 COM-slot checks for the legacy
@@ -285,3 +289,8 @@ checks the resulting package-local storage identity, so a misleading success
 without loading the configuration cannot pass. Three fresh processes use
 synthetic configuration and no account/network/cloud. This does not prove a
 game's version gate or the cause of an early game exit.
+
+Current-package readiness regressions also reject root-level FileGroups, unknown
+payload containers, FileGroups inside Features, and nested payload under Feature.
+These cases accompany a valid chunk so silently skipping the invalid declaration
+would produce a detectable false readiness result.
