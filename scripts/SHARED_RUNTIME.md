@@ -463,3 +463,26 @@ payload declarations in feature metadata. Only consumed `Chunk` file groups and
 `Features`/`Feature` metadata may contribute to readiness; a valid chunk cannot
 hide a missing payload inside an ignored container. Synthetic current-package
 and chunk-enumeration regressions cover these rejected structures.
+
+### Explicit Store product catalog queries
+
+`xgameruntime-store-products.patch` implements `XStoreQueryProductsAsync` and
+`XStoreQueryProductsResult` for up to 100 explicitly requested Store IDs. The
+runtime deduplicates IDs, validates product-kind/action filters, and returns
+bounded catalog metadata, SKU availability and pricing through the existing
+query handle lifecycle. Public catalog metadata never establishes ownership:
+collection flags require an exact, unexpired SKU from a freshly verified signed
+Store receipt. Network failures and cancellation propagate as failures.
+
+The Store probe builder embeds generated synthetic catalog fixtures in
+`store-products-probe.exe`; the executable has no current-directory fixture
+path dependency. The account-free probe uses the production parser/provider,
+the real runtime async machinery and an intentionally failing license bridge.
+Its successful async cases substitute only network work with synthetic data.
+This source increment excludes add-on inventory, purchase/download APIs, the
+private Python bridge and runtime release/promotion. Full live service/game
+validation of this extracted increment remains separate.
+
+Product display pricing prefers an available Purchase offer across SKUs, even
+when a Details/Redeem-only SKU appears first. A genuinely free Purchase remains
+zero-priced; the preference follows the action rather than a nonzero price.
