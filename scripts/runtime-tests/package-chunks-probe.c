@@ -83,6 +83,9 @@ static void tests( void )
     WCHAR path[MAX_PATH];
     HRESULT invalid = HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
     const char *bad[] = {
+        "<Package><Chunk Id=\"1\"/><FileGroup SourcePath=\".\" Include=\"missing.bin\"/></Package>",
+        "<Package><Chunk Id=\"1\"/><Unknown><FileGroup SourcePath=\".\" Include=\"missing.bin\"/></Unknown></Package>",
+        "<Package><Chunk Id=\"1\"/><Features><Feature Id=\"Hidden\"><FileGroup SourcePath=\".\" Include=\"missing.bin\"/></Feature></Features></Package>",
         "<Package><Chunk Id=\"1\"/><Chunk Id=\"1\"/></Package>",
         "<Package><Chunk Id=\"-1\"/></Package>",
         "<Package><Chunk Id=\"4294967296\"/></Package>",

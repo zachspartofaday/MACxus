@@ -237,6 +237,17 @@ static void current_fixtures( void )
     }
     write_text(file, "<Package><Chunk Id=\"1\"><FileGroup SourcePath=\".\" DestinationPath=\"../outside\" Include=\"logo.png\"/></Chunk></Package>");
     current_child(executable, TRUE);
+    /* Unsupported payload structures must never disappear from readiness. */
+    {
+        const char *bad[] = {
+            "<Package><Chunk Id=\"1\"><FileGroup SourcePath=\".\" Include=\"logo.png\"/></Chunk><FileGroup SourcePath=\".\" Include=\"missing.bin\"/></Package>",
+            "<Package><Chunk Id=\"1\"><FileGroup SourcePath=\".\" Include=\"logo.png\"/></Chunk><Unknown><FileGroup SourcePath=\".\" Include=\"missing.bin\"/></Unknown></Package>",
+            "<Package><Chunk Id=\"1\"><FileGroup SourcePath=\".\" Include=\"logo.png\"/></Chunk><Features><FileGroup SourcePath=\".\" Include=\"missing.bin\"/></Features></Package>",
+            "<Package><Chunk Id=\"1\"><FileGroup SourcePath=\".\" Include=\"logo.png\"/></Chunk><Features><Feature Id=\"Hidden\"><FileGroup SourcePath=\".\" Include=\"missing.bin\"/></Feature></Features></Package>"
+        };
+        for (UINT i = 0; i < ARRAY_SIZE(bad); i++)
+        { write_text(file, bad[i]); current_child(executable, TRUE); }
+    }
     write_text(file, "<Package/>"); current_child(executable, TRUE);
     write_text(file, "<Package><Chunk Id=\"1\"><FileGroup SourcePath=\".\" Include=\"logo.png\"/></Chunk><Chunk Id=\"1\"/></Package>");
     current_child(executable, TRUE);

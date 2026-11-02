@@ -133,7 +133,7 @@
              if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
              found = TRUE;
              /* Include can contain a relative subdirectory before its leaf. */
-@@ -332,7 +333,7 @@
+@@ -332,14 +333,29 @@
      } while (FindNextFileW(find, &data));
      FindClose(find);
      if (!layout_valid || layouts != 1) goto done;
@@ -142,6 +142,29 @@
      root = doc ? xmlDocGetRootElement(doc) : NULL;
      if (!root || strcmp((char *)root->name, "Package")) goto done;
      for (node = root->children; node; node = node->next)
+     {
+         struct installed_chunk *chunk;
+         if (node->type != XML_ELEMENT_NODE) continue;
+-        if (strcmp((char *)node->name, "Chunk")) continue;
++        /* Only these two root structures are consumed. Unknown containers
++         * must not hide FileGroups whose missing payload would be ignored. */
++        if (!strcmp((char *)node->name, "Features"))
++        {
++            xmlNodePtr feature;
++            for (feature = node->children; feature; feature = feature->next)
++            {
++                xmlNodePtr child;
++                if (feature->type != XML_ELEMENT_NODE) continue;
++                if (strcmp((char *)feature->name, "Feature")) goto done;
++                for (child = feature->children; child; child = child->next)
++                    if (child->type == XML_ELEMENT_NODE) goto done;
++            }
++            continue;
++        }
++        if (strcmp((char *)node->name, "Chunk")) goto done;
+         if (!content_text(node, "Id", id, sizeof(id))) goto done;
+         if (!strcmp(id, "Registration"))
+         {
 --- a/dlls/xgameruntime/xpackage_content.h
 +++ b/dlls/xgameruntime/xpackage_content.h
 @@ -9,6 +9,9 @@

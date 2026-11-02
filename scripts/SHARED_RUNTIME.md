@@ -457,3 +457,9 @@ layout larger than 1 MiB, missing payload, invalid destinations, duplicate chunk
 and a crowded discovery root. This source increment neither grants a license nor
 implements downloads, mounting or a runtime release. Original-installation anchors
 for transient launch views and add-on discovery remain separate work.
+
+Current-package readiness rejects unsupported layout root structures and nested
+payload declarations in feature metadata. Only consumed `Chunk` file groups and
+`Features`/`Feature` metadata may contribute to readiness; a valid chunk cannot
+hide a missing payload inside an ignored container. Synthetic current-package
+and chunk-enumeration regressions cover these rejected structures.

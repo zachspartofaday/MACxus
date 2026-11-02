@@ -289,3 +289,8 @@ checks the resulting package-local storage identity, so a misleading success
 without loading the configuration cannot pass. Three fresh processes use
 synthetic configuration and no account/network/cloud. This does not prove a
 game's version gate or the cause of an early game exit.
+
+Current-package readiness regressions also reject root-level FileGroups, unknown
+payload containers, FileGroups inside Features, and nested payload under Feature.
+These cases accompany a valid chunk so silently skipping the invalid declaration
+would produce a detectable false readiness result.
