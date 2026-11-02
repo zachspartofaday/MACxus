@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCompatibility } from './runtime-compat/build.mjs';
+import { compatibilityPackConfigure as relativeConfigure } from './compatibility-pack-build.mjs';
 import { buildPlayFabSessionProbe } from './runtime-tests/build-playfab-session.mjs';
 import { buildStoreProbes } from './runtime-tests/build-store-probes.mjs';
 import { buildSaveSyncProbe } from './runtime-tests/build-gamesave-sync-probe.mjs';
@@ -127,7 +128,7 @@ const shaderConfigure = ['--host=x86_64-w64-mingw32', '--enable-shared', '--disa
   '--disable-tests', '--disable-demos', '--without-opengl', '--without-xcb',
   '--without-ncurses', '--without-spirv-tools', `--prefix=${shaderStage}`];
 run('env', ['SONAME_LIBVULKAN=vulkan-1', `CPPFLAGS=-I${path.join(vulkanHeaders, 'include')} -I${path.join(spirvHeaders, 'include')}`,
-  'CFLAGS=-O2 -fno-lto', 'LDFLAGS=-static-libgcc', path.join(shaderSource, 'configure'), ...shaderConfigure], shaderBuild);
+  'CFLAGS=-O2 -fno-lto', 'LDFLAGS=-static-libgcc', relativeConfigure(shaderBuild, shaderSource), ...shaderConfigure], shaderBuild);
 run('make', [`-j${jobs}`], shaderBuild);
 run('make', ['install'], shaderBuild);
 run('cmake', ['-S', ngSource, '-B', ngBuild, '-DCMAKE_SYSTEM_NAME=Windows', '-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc', '-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres', '-DENABLE_LIB_ONLY=ON', '-DBUILD_SHARED_LIBS=ON', '-DBUILD_STATIC_LIBS=OFF', '-DENABLE_DOC=OFF', '-DENABLE_APP=OFF', '-DENABLE_EXAMPLES=OFF', '-DENABLE_FAILMALLOC=OFF', '-DBUILD_TESTING=OFF'], work);
@@ -140,7 +141,7 @@ run('python3', ['make_vulkan', '-x', 'vk.xml', '-X', 'video.xml'], path.join(sou
 run('perl', ['tools/make_specfiles'], source);
 run('autoreconf', ['-fiv'], source);
 await fs.mkdir(build);
-run(path.join(source, 'configure'), provenance.configure, build);
+run(relativeConfigure(build, source), provenance.configure, build);
 run('make', [`-j${jobs}`, 'dlls/xgameruntime/x86_64-windows/xgameruntime.dll', 'dlls/winhttp/x86_64-windows/winhttp.dll', 'dlls/mscoree/x86_64-windows/mscoree.dll', 'dlls/windows.web/x86_64-windows/windows.web.dll', 'dlls/twinapi.appcore/x86_64-windows/twinapi.appcore.dll'], build);
 const shaderDll = path.join(shaderBuild, '.libs/libvkd3d-shader-1.dll');
 // Match Proton's builtin-module marker, retaining its unchanged WineD3D and

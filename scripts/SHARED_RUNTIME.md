@@ -429,3 +429,13 @@ is not promotion of a release artifact; the packaged runtime pin is unchanged.
 FH5's private combined test reached online play, but these authentication changes
 alone do not implement its Store/add-on bridge, UDP socket adaptation, graphics
 or allocator fixes and do not claim complete multiplayer support.
+
+
+Build path handling: Wine and vkd3d configure are invoked using their paths relative
+to the build directory, reusing the Halo recipe helper. Generated Makefiles then
+retain the same source spelling under different temporary roots, including for
+`__FILE__` diagnostics that survive debug stripping. The helper's regression covers
+the runtime's sibling source/build layout and compiles stripped PE fixtures under
+two different absolute roots. Locked source reproduction is verified separately;
+these checks do not claim byte-identical complete runtimes across toolchains or
+dependency builds.
