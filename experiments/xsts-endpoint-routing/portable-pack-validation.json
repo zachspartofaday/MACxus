@@ -1,0 +1,43 @@
+{
+  "recordedAt": "2026-11-02T18:23:40.137926+00:00",
+  "scope": "007 public configuration portable candidate; not a universal online fix",
+  "manifest": "assets/compatibility-packs/bond-public-config-v1/manifest.json",
+  "DLLSHA256": "da5ed135781033a202643b35535c4c92f99353165b5235b56339b9cd0ba338f4",
+  "productionSourceContracts": {
+    "checks": 182,
+    "failures": 0,
+    "realWinHTTPHandlesCreatedWithoutSending": true
+  },
+  "launcherAndExistingHaloTests": {
+    "passed": 48,
+    "failed": 0
+  },
+  "runtimeTools": {
+    "passed": 44,
+    "failed": 0,
+    "skipped": 7,
+    "skipReason": "Existing Linux-only runtime checks on macOS"
+  },
+  "packaging": {
+    "actualASARCompletenessAndTamperChecks": "passed",
+    "sourcePathReproductionRoots": 2,
+    "rootsIncludeSpaces": true,
+    "sameDLLBytes": true,
+    "acceptedCompiler": "MinGW-w64 GCC 16.2.0",
+    "cleanToolchainRebuild": false
+  },
+  "originalWinHTTPForwarding": {
+    "exportNamesAndOrdinalsMatch": 49,
+    "HTTPProbeChecksPerVariant": 55,
+    "inheritedCallbackChecksPerVariant": 59,
+    "invalidOptionAndCallbackIdentityControls": "passed",
+    "transport": "Private loopback; synthetic payloads only"
+  },
+  "typecheck": "passed",
+  "compiledLauncherSchemaLoad": "passed",
+  "livePortablePackValidation": false,
+  "comparison": "The earlier private broader control achieved user-reported online success; this tighter candidate was not launched in a game.",
+  "currentUserSession": "Not stopped or relaunched during packaging work",
+  "independentReview": "Pending fresh Sol review of frozen candidate",
+  "publication": "No upstream submission; no installation or merge"
+}
