@@ -410,3 +410,22 @@ rather than silently changing the base. Component artifacts are uploaded before 
 so a missing base does not lose the clean build. Default publication is off;
 `publish=true` is rejected while the lock is marked `development`. Local
 verification does not claim that a remote GitHub Actions run has succeeded.
+
+
+### Legacy Windows title authentication and endpoint policies
+
+The development lock includes `xgameruntime-windows-title-auth.patch`. For legacy
+Windows packages with a TitleId and no MSAAppId, title authentication uses the
+existing device token and proof key, then requests title-specific endpoint metadata
+with the authenticated title chain. Growing that policy list preserves pointers
+held by earlier endpoints. Lookup prefers specific host/path rules and later
+title rules, including HTTP upgrade policies for WebSockets. The synchronous
+preferred UDP port query now matches its async counterpart: zero means the
+platform has no preference.
+
+The builder includes three account-free source-derived regression probes for this
+increment. Existing MSAAppId authentication remains in place. Source-lock inclusion
+is not promotion of a release artifact; the packaged runtime pin is unchanged.
+FH5's private combined test reached online play, but these authentication changes
+alone do not implement its Store/add-on bridge, UDP socket adaptation, graphics
+or allocator fixes and do not claim complete multiplayer support.
