@@ -52,9 +52,31 @@ code, account data, game-specific routing rules or runtime path constants.
 - The build retains the existing macOS GS last-error header correction for its
   local component checks. This host-specific input is separate from the shared
   source patch.
-- No game, account service or live authentication probe is started for this
-  investigation. The installed runtime, applications and ordinary bottles are
-  unchanged by the candidate work.
+- No game, account service or live authentication probe was started during the
+  offline validation above. The subsequent user-authorized trial is recorded
+  separately below; original applications and game files remain unchanged.
+
+## Subsequent 007 Play-path trial
+
+The reviewed candidate at `4b62105` was installed through the supported runtime
+override and launched through MACxus's normal Play handler. It reached the
+entrance screen but crashed around the F-to-continue transition. The log records
+one game access violation at executable offset `0xa23453`, reached from the
+runtime's async-completion callback, and backend exit code 5. No XSTS refusal was
+recorded before that crash. This does not identify which async operation failed.
+
+Restoring the exact pre-candidate DLL in the same bottle allowed the user to
+reach the main menu without crashing, while online access still failed. Its log
+again records XSTS HTTP 400. This is evidence of a candidate regression and
+blocks treating the full patch as ready for use; its precise cause remains open.
+PR #26 was returned to draft, and the failed trial's log was preserved locally.
+
+A diagnostics-only comparison retains the exact old wildcard matcher while
+adding the reviewed numeric refusal logging. Its five account-free probes pass,
+including 1,191 privilege checks and 88 token ABI checks. A new user trial of
+this comparison is pending. It is an experimental local comparison, not the
+full PR candidate or a newly established online fix. See
+[`live-validation.json`](live-validation.json) for the path-free record.
 
 Before claiming an online fix, test a controlled 007 run and inspect the new
 `endpoint_metadata`, `xerr_present`, `xerr` and `title` fields if authorization
