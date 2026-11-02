@@ -446,6 +446,22 @@ for the comparison and remaining live-test requirements.
 
 ### Legacy Windows title authentication and endpoint policies
 
+`xgameruntime-empty-token-result.patch` keeps token-result storage usable when a
+matched endpoint requires no authorization token. UTF-8 and UTF-16 results then
+contain an owned empty string with its terminator included in the size/count.
+Optional signature storage follows it within the caller's result buffer; a
+signature policy is still applied when present. No authorization request is made
+for a rule with no token type, and failed authorization still returns failure.
+Optional numeric metadata distinguishes authenticated and no-token routes.
+
+The token ABI probe covers both encodings with and without a signature policy,
+buffer ownership and bounds, distinct string storage, termination, preserved
+signatures, and absence of an authorization call for no-token rules. The private
+007 comparison using this change and the wildcard fix completed Xbox token
+requests successfully and continued running, but still failed the game's
+configuration fetch. The original crash's cause and complete online acceptance
+remain unproven; this does not claim Windows-wide or all-title compatibility.
+
 The development lock includes `xgameruntime-windows-title-auth.patch`. For legacy
 Windows packages with a TitleId and no MSAAppId, title authentication uses the
 existing device token and proof key, then requests title-specific endpoint metadata

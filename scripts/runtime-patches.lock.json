@@ -219,6 +219,10 @@
     {
       "file": "assets/xgameruntime-endpoint-wildcards.patch",
       "sha256": "99128549bc253941f29a6ed236220f7e6c447cde82e5272ee9ab5de28ce3fd96"
+    },
+    {
+      "file": "assets/xgameruntime-empty-token-result.patch",
+      "sha256": "9f34c611ddb5d060c19df9fd0f871cf66cfd4c1703305fd8edd9bc03d4926d15"
     }
   ],
   "expectedWineSources": {
@@ -253,7 +257,7 @@
     "dlls/xgameruntime/xsystem.c": "a3c151c5d05875b68f49c534aae9d40e3f15ec800af0f85e159ede7c95401880",
     "dlls/xgameruntime/xsystemanalytics.c": "189e99c83273b429325ecefa2b9246c45863c22f0c4006a791ec57b8f7b9d384",
     "dlls/xgameruntime/xthreading.c": "5abacea265da8948b37f1e953e6bbedf8a98f2d21b11c779fd68e53f3f4b1211",
-    "dlls/xgameruntime/xuser.c": "6603d14cf36f6ceb5be055416ad50242e92ceb3b51aea3f94cc5bca6806aa5eb",
+    "dlls/xgameruntime/xuser.c": "e7c9ba58bc1ecea412fd9366b3cc799f19bb4e87daea3e29255ea3f69c1d4177",
     "dlls/xgameruntime/xuser_audio.h": "66ede45d4fc798612c8dc939b8903bccb0a023228a6618636fd6ed76ca8ed8a7",
     "dlls/xgameruntime/xuser_device_events.h": "ed3b6ac25510b7bff288e36859781811e7de3985d418159ce25a2b00bc6d35cb",
     "dlls/xgameruntime/xuser_privilege.h": "4aa9a2736b59feb4d86cb86d95d99119ab1ccb6ab07b6b9a53c7da61acd0a77b",
@@ -296,6 +300,7 @@
     "Legacy Windows TitleId authentication uses the retained device/proof-key chain and authenticated title endpoint policies. This source increment is not a published runtime or a blanket multiplayer compatibility claim.",
     "Current-package chunk readiness validates full-size bounded layouts and installed payload without depending on sibling-package discovery. This does not grant ownership, implement downloads, or publish a runtime release.",
     "Explicit Store product queries return bounded public catalog metadata; collection ownership requires exact, fresh verified signed SKU receipts. Add-on license discovery, purchases and downloads are not implemented by this increment.",
-    "Shared endpoint wildcard matching and bounded numeric XSTS refusal diagnostics have offline regression coverage; 007 online access is not yet validated with this increment."
+    "Shared endpoint wildcard matching and bounded numeric XSTS refusal diagnostics have offline regression coverage; 007 online access is not yet validated with this increment.",
+    "No-token endpoint results contain owned empty strings in both encodings. Successful Xbox token requests in a private 007 trial do not establish successful game-service configuration or online gameplay."
   ]
 }

@@ -116,5 +116,20 @@
   "outputCaptureTests": {
     "passed": 3,
     "failed": 0
+  },
+  "ownedEmptyTokenFollowup": {
+    "sourceLockSHA256": "ac0fa416026711caf9f7418f4590d7d4a58b18e2f8afcbbe973e9783ddbd491f",
+    "freshRuntimeCObjects": 23,
+    "componentSHA256": "00937e8ae658d141dd9410504e09a359dc8b9fc12e17ae600330d5b8b2ec2098",
+    "accountFreeTokenABI": {
+      "exitCode": 0,
+      "summary": [
+        "CHECKS 140 FAILURES 0"
+      ]
+    },
+    "earlierEightProbeComparison": "Passed; earlier token fixture reported144checks before worker-thread checks were replaced with the main-thread call counter",
+    "independentSourceReconstruction": 36,
+    "gameOnlineAcceptance": false,
+    "privateHTTPObserversIncludedInPatch": false
   }
 }

@@ -78,6 +78,28 @@ this comparison is pending. It is an experimental local comparison, not the
 full PR candidate or a newly established online fix. See
 [`live-validation.json`](live-validation.json) for the path-free record.
 
+The diagnostics-only trial reproduced the configuration-fetch error and XSTS
+HTTP 400. Every observed failed token request reported `endpoint_metadata=0`;
+none yielded accepted numeric `XErr` metadata. This confirms the old fallback
+route was used, but does not identify its audience from the numeric trace.
+
+A separate account-free token-result probe reproduced successful no-token
+responses with null token pointers in both encodings. The follow-up source delta
+returns owned empty strings for this case, including when a signature policy is
+present. The test checks that no authorization request is made for these rules;
+it does not fabricate a credential. The current token ABI probe passes 140
+checks. The older test version reproduced eight empty-token ownership failures
+before the change; its diagnostic count also included worker-thread checks that
+were subsequently replaced with a main-thread authorization-call count.
+
+The private combined comparison produced genuine XSTS HTTP 200 responses and
+successful token retrieval, and continued through no-token routes. The user still
+reported the game configuration-fetch error. This is authentication progress,
+not proof that the no-token representation caused the original crash or that
+the game's own server accepts the current session. Private HTTP observers are
+being used to distinguish response delivery from game-service validation; they
+are not part of this source patch or a released compatibility pack.
+
 Before claiming an online fix, test a controlled 007 run and inspect the new
 `endpoint_metadata`, `xerr_present`, `xerr` and `title` fields if authorization
 still fails. A successful token request also needs validation against the game's
