@@ -1,5 +1,4 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { externalLauncherEnvironment } from './launcher-environment.js';
 
@@ -24,21 +23,45 @@ export interface AddonDiscoveryDeps {
   library: (market: string, signal: AbortSignal) => Promise<unknown>;
   metadata: (url: URL, signal: AbortSignal) => Promise<unknown>;
 }
-const execute = promisify(execFile);
+/** Keep cancellation pending until the selected account helper has exited.
+ * A backend ignoring SIGTERM is escalated to SIGKILL after a bounded grace. */
+export async function loadAddonLibrary(backendBinary: string, market: string, signal: AbortSignal): Promise<unknown> {
+  signal.throwIfAborted();
+  const env = externalLauncherEnvironment();
+  for (const key of Object.keys(env)) if (/^(?:XODUS_|XUSER_|WINE|CX_|MACXUS_|NEXUS_|DYLD_)/.test(key)) delete env[key];
+  env.XODUS_LOG = 'error';
+  return new Promise((resolve, reject) => {
+    const child = spawn(backendBinary, ['library', '--json', '--market', market], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const buffers: Buffer[] = [];
+    let size = 0, failed = false, escalation: NodeJS.Timeout | undefined;
+    const terminate = () => {
+      if (failed) return;
+      failed = true; child.kill('SIGTERM');
+      escalation = setTimeout(() => child.kill('SIGKILL'), 1000);
+    };
+    const deadline = setTimeout(terminate, 50_000);
+    signal.addEventListener('abort', terminate, { once: true });
+    if (signal.aborted) terminate();
+    child.stdout.on('data', (bytes: Buffer) => {
+      if (failed) return;
+      size += bytes.length;
+      if (size > 16 * 1024 * 1024) { terminate(); return; }
+      buffers.push(bytes);
+    });
+    // Account diagnostics are never returned to the game or launcher logs.
+    child.stderr.resume();
+    child.once('error', () => { failed = true; });
+    child.once('close', code => {
+      clearTimeout(deadline); clearTimeout(escalation); signal.removeEventListener('abort', terminate);
+      if (failed || signal.aborted || code !== 0) { reject(Error('Account inventory unavailable.')); return; }
+      try { resolve(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers)))); }
+      catch { reject(Error('Invalid account inventory.')); }
+    });
+  });
+}
 function productionDeps(backendBinary: string): AddonDiscoveryDeps {
   return {
-    library: async (market, signal) => {
-      // The caller supplies the already selected/validated backend. Never search
-      // Applications, PATH, or the network for another credential-bearing binary.
-      const env = externalLauncherEnvironment();
-      for (const key of Object.keys(env)) if (/^(?:XODUS_|XUSER_|WINE|CX_|MACXUS_|NEXUS_|DYLD_)/.test(key)) delete env[key];
-      env.XODUS_LOG = 'error';
-      const result = await execute(backendBinary, ['library', '--json', '--market', market], {
-        env,
-        encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 50_000, signal,
-      });
-      return JSON.parse(result.stdout);
-    },
+    library: (market, signal) => loadAddonLibrary(backendBinary, market, signal),
     metadata: async (url, signal) => {
       if (url.protocol !== 'https:' || url.port || url.username || url.password || url.hash ||
           !['displaycatalog.mp.microsoft.com', 'storeedgefd.dsx.mp.microsoft.com'].includes(url.hostname)) throw Error('Invalid metadata endpoint.');

@@ -1,4 +1,7 @@
 import { expect, it, vi } from 'vitest';
+import { promises as fs, watch } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { createStoreAddonDiscovery, parseAddonDiscoveryRequest, type AddonDiscoveryDeps } from './store-addon-discovery.js';
 const parent = 'B00000000001', addon = 'B00000000002', other = 'B00000000003';
 const request = Buffer.from(`<Request><ParentProductId>${parent}</ParentProductId><Market>US</Market></Request>`);
@@ -88,4 +91,27 @@ it('bounds unknown candidates while retaining a slot for the base-title proof', 
     metadata: async url => url.hostname.startsWith('displaycatalog') ? { Products: [] } : {},
   };
   expect((await createStoreAddonDiscovery('/backend', parent, deps)(request, new AbortController().signal)).toString()).toContain('2147500037');
+});
+
+it('waits for termination of a relocated backend that ignores SIGTERM before releasing the request gate', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'addon backend with spaces '));
+  const binary = path.join(root, 'xodus-cli'), marker = path.join(root, 'ready');
+  let pid: number | undefined;
+  const watcher = watch(root);
+  const ready = new Promise<void>(resolve => watcher.on('change', (_, file) => { if (file === 'ready') resolve(); }));
+  await fs.writeFile(binary, `#!/usr/bin/env node\nconst fs=require('node:fs');process.on('SIGTERM',()=>{});fs.writeFileSync(${JSON.stringify(marker)},String(process.pid));setInterval(()=>{},1000);\n`, { mode: 0o700 });
+  const cancelled = new AbortController();
+  try {
+    const handler = createStoreAddonDiscovery(binary, parent);
+    const running = handler(request, cancelled.signal);
+    await ready; pid = Number(await fs.readFile(marker, 'utf8'));
+    cancelled.abort();
+    expect((await handler(request, new AbortController().signal)).toString()).toContain('2147942570');
+    expect((await running).toString()).toContain('2147500036');
+    expect(() => process.kill(pid!, 0)).toThrow();
+  } finally {
+    cancelled.abort(); watcher.close();
+    if (pid) { try { process.kill(pid, 'SIGKILL'); } catch { /* already reaped */ } }
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
