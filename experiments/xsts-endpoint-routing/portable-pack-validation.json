@@ -1,15 +1,15 @@
 {
-  "recordedAt": "2026-11-02T18:23:40.137926+00:00",
+  "recordedAt": "2026-11-02T19:18:51.829804+00:00",
   "scope": "007 public configuration portable candidate; not a universal online fix",
   "manifest": "assets/compatibility-packs/bond-public-config-v1/manifest.json",
-  "DLLSHA256": "da5ed135781033a202643b35535c4c92f99353165b5235b56339b9cd0ba338f4",
+  "DLLSHA256": "eed2ae442fbbf3ab3232e50db14c6ce0a7abc9c62e19e8338bd665f44f499380",
   "productionSourceContracts": {
-    "checks": 182,
+    "checks": 218,
     "failures": 0,
     "realWinHTTPHandlesCreatedWithoutSending": true
   },
   "launcherAndExistingHaloTests": {
-    "passed": 48,
+    "passed": 52,
     "failed": 0
   },
   "runtimeTools": {
@@ -38,6 +38,32 @@
   "livePortablePackValidation": false,
   "comparison": "The earlier private broader control achieved user-reported online success; this tighter candidate was not launched in a game.",
   "currentUserSession": "Not stopped or relaunched during packaging work",
-  "independentReview": "Pending fresh Sol review of frozen candidate",
-  "publication": "No upstream submission; no installation or merge"
+  "independentReview": "Initial Sol findings implemented and regression-tested; fresh frozen-candidate recheck pending",
+  "publication": "No upstream submission; no installation or merge",
+  "credentialRegressionLoopback": {
+    "exitCode": 0,
+    "duplicateAuthorizationPreserved": true,
+    "storedAuthorizationOverridePreserved": true,
+    "singleUnsupportedInlineRemoved": true,
+    "requests": 9,
+    "configuredCredentialsPreserved": true,
+    "bypassedCredentialGuardNegativeControlShowsBasic": true,
+    "remoteRequests": false,
+    "targetEligibilityMocked": true
+  },
+  "initialIndependentReview": {
+    "candidate": "a000efa5c5caefafddbb20f6b0cba42108d103d1",
+    "disposition": "Requested changes",
+    "findings": [
+      "Duplicate Authorization could expose an overridden credential",
+      "Ordinary setup destinations were incompletely preflighted",
+      "Absent pack directory did not fall back as documented"
+    ],
+    "resolutions": [
+      "Duplicate fields preserve the complete inline block; stored Authorization and WinHttpSetCredentials requests are excluded; ASCII comparison is locale-independent",
+      "Halo and native packs share the complete ordinary setup preflight; linked temporary/runtime/runner/registry targets and escaping C: mappings have regressions",
+      "Absent pack directory falls back; present missing/invalid metadata still fails"
+    ],
+    "independentRecheck": "Pending"
+  }
 }

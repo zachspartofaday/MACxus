@@ -9,16 +9,16 @@
   "environment": {
     "MACXUS_007_PUBLIC_CONFIG": "1"
   },
-  "dllSHA256": "da5ed135781033a202643b35535c4c92f99353165b5235b56339b9cd0ba338f4",
+  "dllSHA256": "eed2ae442fbbf3ab3232e50db14c6ce0a7abc9c62e19e8338bd665f44f499380",
   "baseNativeSHA256": "e4bd839a5d49a5f43f452308007e727e565a02142e887cfb38e2c41ba4b64a52",
   "toolchain": {
     "gcc": "16.2.0"
   },
   "sources": {
-    "winhttp.c": "d348408414107d4cf1ea5e9fbc19ef40b79acffb11337d9c4573ee799c64eb7b",
-    "winhttp.def": "2958a71d98ea20f5cc9d4ae06c2fb36e166b578bfed7d3935590676acba3d3f7",
+    "winhttp.c": "93816be1f1f85e1a29506afc8fe7175af2c42ce6edc57f714090e84496aa4d30",
+    "winhttp.def": "72b74f7b41626760c4cc0e614a9a614eb293aea2cdffff039138859620e41831",
     "build.mjs": "b15ecd03f88576c7c0f10b2ce02614336fb486f3d6d489b3599de81a99e85054",
-    "test.c": "12cf412777c462e272ac450353214cf84b01e7fbd1c6ca376efae53e22a4e5e3"
+    "test.c": "b921b789b49220a64e56e1c82ef95c3b050e067377030a182daa2d099485e316"
   },
   "licenseSHA256": "295f102e5a13c347d7d9e0eeec06d058744d89da14312afe64b30299eaa35964",
   "acceptance": "Offline candidate; live portable-pack test pending; private broader control succeeded"

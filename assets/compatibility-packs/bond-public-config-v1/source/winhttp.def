@@ -34,7 +34,7 @@ EXPORTS
  WinHttpReceiveResponse=mxhttp.WinHttpReceiveResponse @32
  WinHttpResetAutoProxy=mxhttp.WinHttpResetAutoProxy @33
  WinHttpSendRequest @34
- WinHttpSetCredentials=mxhttp.WinHttpSetCredentials @35
+ WinHttpSetCredentials @35
  WinHttpSetDefaultProxyConfiguration=mxhttp.WinHttpSetDefaultProxyConfiguration @36
  WinHttpSetOption=mxhttp.WinHttpSetOption @37
  WinHttpSetStatusCallback=mxhttp.WinHttpSetStatusCallback @38

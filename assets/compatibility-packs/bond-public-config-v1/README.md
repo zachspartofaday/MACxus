@@ -66,15 +66,20 @@ Only the selected game receives `MACXUS_007_PUBLIC_CONFIG=1`; the DLL additional
 checks the executable basename. To disable filtering while retaining this bottle,
 set the game's launch options to `MACXUS_007_PUBLIC_CONFIG=0 %command%` (preserve
 any other options you use). No networking headers are logged. The wrapper leaves
-recognized schemes and all query-bearing URLs untouched. Requests outside the
+recognized schemes and all query-bearing URLs untouched. Duplicate Authorization
+fields and requests with an already installed Authorization field are forwarded
+unchanged to avoid exposing a credential suppressed by an override. Requests
+that use WinHttpSetCredentials are also excluded, since the original sender may
+materialize those credentials only after the presence check. Requests outside the
 narrow rule use the original transport. Table exhaustion and unrecognized header
-syntax preserve the original request. The effective URL is checked again before each send, and reused handle identities
-replace old metadata. Existing WinHTTP-added headers are not
-removed; this candidate only handles the inline block implicated by the trace.
+syntax preserve the original request. The effective URL is checked again before
+each send, and reused handle identities replace old metadata. Existing
+WinHTTP-added headers are not removed; this candidate only handles the inline block implicated by the trace.
 
-The original DLL remains available as `mxhttp.dll` in that private bottle. Removing
-the pack from the application selects the normal engine/bottle on a subsequent
-launch; dedicated bottle data is retained. Do not delete a bottle to roll back.
+The original DLL remains available as `mxhttp.dll` in that private bottle. Using
+a MACxus build without the entire pack directory selects the normal engine/bottle
+on a subsequent launch; dedicated bottle data is retained. A present directory
+with missing or invalid manifest metadata still fails validation. Do not delete a bottle to roll back.
 
 ## Offline contract probe
 

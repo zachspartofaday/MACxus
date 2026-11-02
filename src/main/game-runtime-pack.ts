@@ -1,3 +1,4 @@
+import { validateCompatibilityPrefix } from './compatibility-prefix.js';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -41,7 +42,18 @@ async function existing(name: string): Promise<Buffer | undefined> {
  */
 export async function prepareGameRuntimePack(request: CompatibilityPackRequest, assetRoot = ASSET_ROOT): Promise<CompatibilityPack | undefined> {
   if (request.storeId?.toUpperCase() !== '9PN198B459VB' || request.engine !== 'crossover-preview' || request.installation.supportsArm64) return undefined;
-  const manifest = parseRuntimePack(JSON.parse(await fs.readFile(path.join(assetRoot, 'manifest.json'), 'utf8')));
+  let metadata: string;
+  try { metadata = await fs.readFile(path.join(assetRoot, 'manifest.json'), 'utf8'); }
+  catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    try { await fs.lstat(assetRoot); }
+    catch (missing) {
+      if ((missing as NodeJS.ErrnoException).code !== 'ENOENT') throw missing;
+      request.log('007 public configuration pack is unavailable; using the selected engine.'); return undefined;
+    }
+    throw Error('007 public configuration pack manifest is missing.');
+  }
+  const manifest = parseRuntimePack(JSON.parse(metadata));
   const config = await fs.readFile(path.join(request.installation.root, 'etc/CrossOver.conf'), 'utf8');
   if (manifest.version !== request.installation.version || !config.split(/\r?\n/).some(l => l.trim() === `"BuildTag" = "${manifest.buildTag}"`)) {
     request.log('007 public configuration pack does not match this Preview build; using the selected engine.'); return undefined;
@@ -60,7 +72,8 @@ export async function prepareGameRuntimePack(request: CompatibilityPackRequest, 
   const prefix = path.join(bottlesRoot, 'xbox');
   const validatePrefix = async (actual: string) => {
     if (path.resolve(actual) !== prefix) throw Error('007 runtime pack requires its dedicated bottle.');
-    await directories(request.dataRoot, [...parts, 'xbox', 'drive_c', 'windows', 'system32'], false);
+    await directories(request.dataRoot, parts, false);
+    await validateCompatibilityPrefix(prefix, bottlesRoot);
     const system = path.join(prefix, 'drive_c/windows/system32');
     const current = await existing(path.join(system, 'winhttp.dll'));
     const alias = await existing(path.join(system, 'mxhttp.dll'));

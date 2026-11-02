@@ -5,6 +5,7 @@ import os from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 import { prepareGameRuntimePack } from './game-runtime-pack.js';
 import type { CompatibilityPackRequest } from './game-compatibility-pack.js';
+import { MAC_RUNTIME_DLLS, installRuntimeDlls } from './crossover.js';
 import { parseRuntimePack } from '../shared/runtime-pack-schema.mjs';
 const roots: string[]=[];
 const digest=(b: string|Buffer)=>createHash('sha256').update(b).digest('hex');
@@ -49,6 +50,44 @@ describe('007 runtime pack isolation',()=>{
    await expect(fs.stat(f.data)).rejects.toMatchObject({code:'ENOENT'});
    f.request.installation.version='different';expect(await prepareGameRuntimePack(f.request,f.assets)).toBeUndefined();
  });
+ it('falls back for an absent pack directory, while a present incomplete/corrupt pack fails',async()=>{
+   const f=await fixture();await fs.rename(f.assets,f.assets+'-removed');
+   expect(await prepareGameRuntimePack(f.request,f.assets)).toBeUndefined();
+   await expect(fs.stat(f.data)).rejects.toMatchObject({code:'ENOENT'});
+   await fs.rename(f.assets+'-removed',f.assets);await fs.unlink(path.join(f.assets,'manifest.json'));
+   await expect(prepareGameRuntimePack(f.request,f.assets)).rejects.toThrow('manifest is missing');
+   await fs.writeFile(path.join(f.assets,'manifest.json'),'{broken');
+   await expect(prepareGameRuntimePack(f.request,f.assets)).rejects.toThrow();
+   await expect(fs.stat(f.data)).rejects.toMatchObject({code:'ENOENT'});
+ });
+ it('blocks ordinary setup from following a runtime temporary-file symlink outside the bottle',async()=>{
+   const f=await fixture();const p=await setup(f);const source=path.join(f.root,'runtime');await fs.mkdir(source);
+   for(const name of MAC_RUNTIME_DLLS)await fs.writeFile(path.join(source,name),'synthetic runtime');
+   const sentinel=path.join(f.root,'outside-sentinel');await fs.writeFile(sentinel,'preserved');
+   await fs.symlink(sentinel,path.join(p.system,`xgameruntime.dll.nexus-${process.pid}`));
+   await expect(p.pack.validatePrefix(p.prefix).then(()=>installRuntimeDlls(p.prefix,source))).rejects.toThrow('setup files must not be links');
+   expect(await fs.readFile(sentinel,'utf8')).toBe('preserved');
+   expect(await fs.readFile(path.join(p.system,'winhttp.dll'),'utf8')).toBe(f.original);
+ });
+ it('preflights all ordinary runtime, runner and registry write destinations',async()=>{
+   const targets=[...MAC_RUNTIME_DLLS.flatMap(n=>[`drive_c/windows/system32/${n}`,`drive_c/windows/system32/${n}.nexus-${process.pid}`]),'system.reg','user.reg','.macxus-overrides'];
+   for(const relative of targets){for(const kind of ['symbolic','hard']){
+     const f=await fixture();const p=await setup(f);const target=path.join(p.prefix,relative),outside=path.join(f.root,'outside');
+     await fs.writeFile(outside,'preserved');await fs.unlink(target).catch(e=>{if(e.code!=='ENOENT')throw e;});
+     if(kind==='symbolic')await fs.symlink(outside,target);else await fs.link(outside,target);
+     await expect(p.pack.validatePrefix(p.prefix)).rejects.toThrow('setup files must not be links');
+     expect(await fs.readFile(outside,'utf8')).toBe('preserved');
+   }}
+   for(const name of ['xodus-crossover-wine',`xodus-crossover-wine.tmp-${process.pid}`]){
+     const f=await fixture();const p=await setup(f);const outside=path.join(f.root,'outside');await fs.writeFile(outside,'preserved');await fs.symlink(outside,path.join(p.pack.bottlesRoot,name));
+     await expect(p.pack.validatePrefix(p.prefix)).rejects.toThrow('setup files must not be links');
+     expect(await fs.readFile(outside,'utf8')).toBe('preserved');
+   }
+ });
+ it('rejects a C drive mapping outside the dedicated bottle',async()=>{
+   const f=await fixture();const p=await setup(f);await fs.mkdir(path.join(p.prefix,'dosdevices'));await fs.symlink(f.root,path.join(p.prefix,'dosdevices/c:'));
+   await expect(p.pack.validatePrefix(p.prefix)).rejects.toThrow('own drive_c');
+ });
  it('rejects tampered source before creating user state',async()=>{
    const f=await fixture();await fs.appendFile(path.join(f.assets,'source/winhttp.c'),'tampered');
    await expect(prepareGameRuntimePack(f.request,f.assets)).rejects.toThrow('checksum mismatch');
@@ -74,7 +113,7 @@ describe('007 runtime pack isolation',()=>{
  });
  it('checks parent directories before Wine setup',async()=>{
    const f=await fixture();const p=await setup(f);await fs.rename(p.system,p.system+'-outside');await fs.symlink(p.system+'-outside',p.system);
-   await expect(p.pack.validatePrefix(p.prefix)).rejects.toThrow('plain directories');
+   await expect(p.pack.validatePrefix(p.prefix)).rejects.toThrow('setup directories');
  });
  it('rejects paths or unsupported environment settings in metadata',async()=>{
    const f=await fixture();expect(()=>parseRuntimePack({...f.manifest,sources:{...f.manifest.sources,'../../extra':digest('x')}})).toThrow();
