@@ -412,6 +412,32 @@ so a missing base does not lose the clean build. Default publication is off;
 verification does not claim that a remote GitHub Actions run has succeeded.
 
 
+### Shared endpoint matching and XSTS refusals
+
+`xgameruntime-endpoint-wildcards.patch` fixes wildcard matching in the shared
+endpoint lookup used by both explicit-MSA and legacy Windows title identities.
+Catch-all and trailing `*` patterns consume the remaining hostname, matching
+can backtrack after reaching the end of a pattern, and DNS host comparisons are
+case-insensitive. Exact-host, path-specific, title-list precedence and WebSocket
+upgrade rules remain covered by the endpoint probe. The runtime uses the
+matched service's supplied audience and policy; no game-specific audience is
+added. Existing fallback behavior for genuinely unmatched URLs is retained.
+
+On XSTS refusal the normal error log additionally records whether a bounded
+numeric `XErr` is present, its value, and whether a title token was included.
+An authorization failure during a token request also records whether endpoint
+metadata matched or the existing fallback was used. No response message,
+redirect URL, token or account identity is added to these diagnostics. Missing,
+malformed, fractional or out-of-range `XErr` values are ignored, and responses
+larger than 16 KiB are not parsed for diagnostics. A refusal stays a failure;
+there is no audience substitution or automatic removal of a title claim.
+
+The endpoint and privilege probes compile the production helpers using
+synthetic hosts, identities and transport. These are offline regressions, not
+proof that 007 First Light or any other title can connect online. See
+[`experiments/xsts-endpoint-routing/README.md`](../experiments/xsts-endpoint-routing/README.md)
+for the comparison and remaining live-test requirements.
+
 ### Legacy Windows title authentication and endpoint policies
 
 The development lock includes `xgameruntime-windows-title-auth.patch`. For legacy

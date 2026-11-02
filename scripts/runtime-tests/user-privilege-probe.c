@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <roapi.h>
 #include <winstring.h>
 #define WIDL_using_Windows_Data_Json
@@ -57,8 +58,34 @@ static HRESULT xuser_signed_request(XUserHandle user, const char *method, const 
     return S_OK;
 }
 #define TRACE(...) ((void)0)
-#define ERR(...) ((void)0)
+static char last_diagnostic[512];
+#define ERR(...) snprintf(last_diagnostic, sizeof(last_diagnostic), __VA_ARGS__)
 #include "user-privilege-adapter.inc"
+
+static void test_refusal_metadata(void)
+{
+    const struct { const char *body; BOOL valid; DWORD code; } cases[] = {
+        {"{\"XErr\":2148916233}", TRUE, 2148916233u},
+        {"{\"XErr\":0}", TRUE, 0},
+        {"{\"XErr\":4294967295}", TRUE, 0xffffffffu},
+        {"{\"XErr\":\"2148916233\"}", FALSE, 0},
+        {"{\"XErr\":-1}", FALSE, 0},
+        {"{\"XErr\":4294967296}", FALSE, 0},
+        {"{\"XErr\":1.5}", FALSE, 0},
+        {"{\"XErr\":null}", FALSE, 0},
+        {"{\"Message\":\"synthetic-secret-never-logged\"}", FALSE, 0},
+        {"invalid", FALSE, 0},
+    };
+    DWORD code;
+    for (UINT i = 0; i < sizeof(cases)/sizeof(*cases); ++i)
+    {
+        code = 123;
+        CHECK("numeric-error-metadata", xsts_error_code((const BYTE *)cases[i].body,
+            strlen(cases[i].body), &code) == cases[i].valid && code == cases[i].code);
+    }
+    CHECK("no-error-body", !xsts_error_code(NULL, 0, &code) && !code);
+    CHECK("bounded-error-body", !xsts_error_code((const BYTE *)"{}", 16385, &code) && !code);
+}
 
 static void test_server_adapter(void)
 {
@@ -88,6 +115,11 @@ static void test_server_adapter(void)
     adapter_response = cases[0].response;
     adapter_status = 400;
     CHECK("adapter-http-400-not-granted", user_verify_privilege(&user.IUser_iface,254) == E_FAIL);
+    adapter_response = "{\"XErr\":2148916233,\"Message\":\"synthetic-secret-never-logged\",\"Redirect\":\"https://private.example.test/\"}";
+    CHECK("adapter-refusal-stays-failure", user_verify_privilege(&user.IUser_iface,254) == E_FAIL);
+    CHECK("adapter-numeric-only-refusal", strstr(last_diagnostic, "xerr_present 1, xerr 2148916233") &&
+        !strstr(last_diagnostic, "synthetic-secret") && !strstr(last_diagnostic, "private.example"));
+    adapter_response = cases[0].response;
     adapter_status = 403;
     CHECK("adapter-http-403-not-granted", user_verify_privilege(&user.IUser_iface,254) == E_FAIL);
     adapter_status = 200; adapter_transport_hr = HRESULT_FROM_WIN32(ERROR_TIMEOUT);
@@ -280,6 +312,7 @@ int main(void)
         FAILED(query(&CLSID_XUserImpl, &IID_IXUserImpl, (void **)&users))) return 2;
     user.iface.lpVtbl = &user_vtbl; user.refs = 1;
     test_claims();
+    test_refusal_metadata();
     test_server_adapter();
     CHECK("null-user", privilege_begin(threads, NULL, 0, 254, &block, verify) == E_INVALIDARG);
     CHECK("null-block", privilege_begin(threads, &user.iface, 0, 254, NULL, verify) == E_INVALIDARG);

@@ -1,0 +1,127 @@
+--- a/dlls/xgameruntime/xuser.c
++++ b/dlls/xgameruntime/xuser.c
+@@ -984,14 +984,18 @@
+ 
+     TRACE( "pat %s, inp %s.\n", debugstr_wn( pat, patLen ), debugstr_wn( inp, inpLen ) );
+ 
+-    while (inpOff < inpLen && patOff < patLen)
+-    {
+-        if (pat[patOff] == '*')
++    /* DNS host matching is case-insensitive. Keep backtracking even after
++     * reaching the pattern's end, and let a trailing star consume zero or
++     * more characters instead of falling through to a guessed audience. */
++    while (inpOff < inpLen)
++    {
++        if (patOff < patLen && pat[patOff] == '*')
+         {
+             lastWildcard = patOff++;
+             lastMatch = inpOff;
+         }
+-        else if (pat[patOff] == '?' || pat[patOff] == inp[inpOff])
++        else if (patOff < patLen && (pat[patOff] == '?' ||
++                 !wcsnicmp(pat + patOff, inp + inpOff, 1)))
+         {
+             patOff++;
+             inpOff++;
+@@ -1003,8 +1007,8 @@
+         }
+         else return FALSE;
+     }
+-
+-    return inpOff == inpLen && patOff == patLen;
++    while (patOff < patLen && pat[patOff] == '*') ++patOff;
++    return patOff == patLen;
+ }
+ 
+ static HRESULT WINAPI user_GetEndpointInfo( IUser *iface, const char *url, struct endpoint *info )
+@@ -1868,10 +1872,12 @@
+         case XAsyncOp_DoWork:
+         {
+             WCHAR *partyBuf = NULL;
++            BOOL endpoint_metadata = TRUE;
+             /* Fallback relying party for URLs missing from the endpoint table;
+              * heap-owned only for the web-origin case, freed at complete. */
+             if (FAILED(hr = IUser_GetEndpointInfo( &context->user->IUser_iface, context->url, &info )))
+             {
++                endpoint_metadata = FALSE;
+                 /* The endpoint table only covers the partners returned at sign-in.
+                  * Titles also request tokens for other services: Xbox Live hosts
+                  * (e.g. the RTA websocket at wss://rta.xboxlive.com/connect) get an
+@@ -1910,7 +1916,11 @@
+                 }
+                 if (FAILED(hr = WindowsCreateStringReference( typeW, ARRAY_SIZE(typeW) - 1, &typeHeader, &info.tokenType ))) goto complete;
+             }
+-            if (info.tokenType && FAILED(hr = IUser_GetAuthorization( &context->user->IUser_iface, WindowsGetStringRawBuffer(info.relyingParty, NULL), &auth ))) goto complete;
++            if (info.tokenType && FAILED(hr = IUser_GetAuthorization( &context->user->IUser_iface, WindowsGetStringRawBuffer(info.relyingParty, NULL), &auth )))
++            {
++                ERR( "token authorization failed, endpoint_metadata %u, hr %#lx.\n", endpoint_metadata, hr );
++                goto complete;
++            }
+ 
+             if (context->isUtf16)
+             {
+@@ -2753,6 +2763,52 @@
+     return xsts_authorize_privilege( user, relyingParty, title, auth, 0, NULL );
+ }
+ 
++/* Error bodies are untrusted. Retain only an optional bounded numeric XErr,
++ * never request/response text, tokens, identities or redirect URLs. Diagnostic
++ * parsing must not change the original authorization failure. */
++static BOOL xsts_error_code( const BYTE *buffer, SIZE_T size, DWORD *code )
++{
++    static const WCHAR *class_name = RuntimeClass_Windows_Data_Json_JsonValue;
++    IJsonValueStatics *statics = NULL;
++    IJsonObject *object = NULL;
++    IJsonValue *value = NULL;
++    HSTRING_HEADER header;
++    HSTRING class_id, text = NULL;
++    WCHAR *wide = NULL;
++    DOUBLE number;
++    int length;
++    HRESULT com;
++    BOOL valid = FALSE;
++
++    *code = 0;
++    if (!buffer || !size || size > 16384) return FALSE;
++    com = CoInitializeEx( NULL, COINIT_MULTITHREADED );
++    if (FAILED(com) && com != RPC_E_CHANGED_MODE) goto cleanup;
++    if (FAILED(WindowsCreateStringReference(class_name, wcslen(class_name), &header, &class_id))) goto cleanup;
++    if (FAILED(RoGetActivationFactory(class_id, &IID_IJsonValueStatics, (void **)&statics))) goto cleanup;
++    if (!(length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (const char *)buffer, size, NULL, 0))) goto cleanup;
++    if (!(wide = calloc(length + 1, sizeof(*wide)))) goto cleanup;
++    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (const char *)buffer, size, wide, length)) goto cleanup;
++    if (FAILED(WindowsCreateString(wide, length, &text))) goto cleanup;
++    /* Do not use parse_json: its TRACE includes the complete response body. */
++    if (FAILED(IJsonValueStatics_Parse(statics, text, &value))) goto cleanup;
++    if (FAILED(IJsonValue_GetObject(value, &object))) goto cleanup;
++    if (SUCCEEDED(get_json_number(object, L"XErr", &number)) &&
++        number >= 0 && number <= UINT32_MAX && number == (DWORD)number)
++    {
++        *code = (DWORD)number;
++        valid = TRUE;
++    }
++cleanup:
++    if (object) IJsonObject_Release( object );
++    if (value) IJsonValue_Release( value );
++    if (statics) IJsonValueStatics_Release( statics );
++    if (text) WindowsDeleteString( text );
++    free( wide );
++    if (SUCCEEDED(com)) CoUninitialize();
++    return valid;
++}
++
+ static HRESULT xsts_authorize_privilege( XUserHandle user, const char *relyingParty, BOOL title,
+                                          char **auth, XUserPrivilege privilege, BOOLEAN *granted )
+ {
+@@ -2791,7 +2847,10 @@
+                                           body, strlen( body ), &status, &buffer, &bufferSize ))) goto cleanup;
+     if (status != 200)
+     {
+-        ERR( "xsts authorization failed, status %lu.\n", status );
++        DWORD error_code;
++        BOOL has_error = xsts_error_code(buffer, bufferSize, &error_code);
++        ERR( "xsts authorization failed, status %lu, xerr_present %u, xerr %lu, title %u.\n",
++             status, has_error, error_code, !!title );
+         hr = E_FAIL;
+         goto cleanup;
+     }
