@@ -1,8 +1,8 @@
 {
-  "recordedAt": "2026-11-02T19:18:51.829804+00:00",
+  "recordedAt": "2026-11-02T19:59:10.865366+00:00",
   "scope": "007 public configuration portable candidate; not a universal online fix",
   "manifest": "assets/compatibility-packs/bond-public-config-v1/manifest.json",
-  "DLLSHA256": "eed2ae442fbbf3ab3232e50db14c6ce0a7abc9c62e19e8338bd665f44f499380",
+  "DLLSHA256": "594114d604cba920bf2fd4b4a15c7a704361bff6a4bf6e1558420e20a56f3a66",
   "productionSourceContracts": {
     "checks": 218,
     "failures": 0,
@@ -24,21 +24,33 @@
     "rootsIncludeSpaces": true,
     "sameDLLBytes": true,
     "acceptedCompiler": "MinGW-w64 GCC 16.2.0",
-    "cleanToolchainRebuild": false
+    "cleanToolchainRebuild": false,
+    "entryPoint": "DllMain; no CRT startup objects or TLS/constructors",
+    "debugData": "stripped at link time",
+    "CRTLibraryBottleComparison": {
+      "bottles": [
+        "arm64_golden_gate",
+        "arm64_sequoia"
+      ],
+      "sameNewDLLBytes": true,
+      "sameCompilerExecutable": true,
+      "scope": "Installed compiler with each bottle library set; complete second compiler could not execute due to host dependency mismatch"
+    }
   },
   "originalWinHTTPForwarding": {
     "exportNamesAndOrdinalsMatch": 49,
     "HTTPProbeChecksPerVariant": 55,
     "inheritedCallbackChecksPerVariant": 59,
     "invalidOptionAndCallbackIdentityControls": "passed",
-    "transport": "Private loopback; synthetic payloads only"
+    "transport": "Private loopback; synthetic payloads only",
+    "repeatedOnNewRecipe": true
   },
   "typecheck": "passed",
   "compiledLauncherSchemaLoad": "passed",
   "livePortablePackValidation": false,
   "comparison": "The earlier private broader control achieved user-reported online success; this tighter candidate was not launched in a game.",
   "currentUserSession": "Not stopped or relaunched during packaging work",
-  "independentReview": "Initial Sol findings implemented and regression-tested; fresh frozen-candidate recheck pending",
+  "independentReview": "Exact 81a5f90 recheck found no new actionable findings; CI recipe follow-up awaiting separate recheck",
   "publication": "No upstream submission; no installation or merge",
   "credentialRegressionLoopback": {
     "exitCode": 0,
@@ -64,6 +76,12 @@
       "Halo and native packs share the complete ordinary setup preflight; linked temporary/runtime/runner/registry targets and escaping C: mappings have regressions",
       "Absent pack directory falls back; present missing/invalid metadata still fails"
     ],
-    "independentRecheck": "Pending"
+    "independentRecheck": "81a5f9016090a1ca6c25ec54de152f2b9e76b07a passed; prior findings closed"
+  },
+  "buildFollowUp": {
+    "rebuildArgumentDispatchedToBothPackBuilders": true,
+    "runtimeRebuildSkipsPayloadCache": true,
+    "detachRace": "bounded retries while authoritative inventory still lists image; never force detach or remove a mounted image",
+    "gameLaunched": false
   }
 }

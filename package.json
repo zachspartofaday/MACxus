@@ -22,7 +22,7 @@
     "pack": "npm run build && electron-builder --linux dir --publish never",
     "compatibility:generate": "node scripts/compatibility/generate.mjs",
     "compatibility:check": "node scripts/compatibility/generate.mjs --check",
-    "prepare:mac-media-pack": "node scripts/prepare-compatibility-packs.mjs && node scripts/prepare-runtime-pack.mjs",
+    "prepare:mac-media-pack": "node scripts/prepare-mac-media-packs.mjs",
     "stage:mac-release-sources": "node scripts/stage-compatibility-pack-sources.mjs release",
     "test:compatibility": "node --test scripts/ci/compatibility.test.mjs"
   },

@@ -25,8 +25,13 @@ for (const [name, expected] of Object.entries(manifest.sources)) {
 const work = await fs.mkdtemp(path.join(os.tmpdir(), 'macxus-007-build-'));
 try {
   for (const name of ['winhttp.c', 'winhttp.def']) await fs.copyFile(path.join(source, name), path.join(work, name));
-  execFileSync(compiler, ['-shared', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-cast-function-type',
-    'winhttp.c', 'winhttp.def', '-o', 'winhttp.dll', '-Wl,--no-insert-timestamp,--image-base,0x180000000'],
+  // This C forwarder has no TLS, constructors or CRT-managed state. Use its
+  // DllMain directly and import C helpers from msvcrt; toolchain CRT startup
+  // objects differ between Homebrew's macOS bottles even at the same version.
+  // Strip at link time so those bottles' debug paths cannot enter the payload.
+  execFileSync(compiler, ['-shared', '-nostdlib', '-s', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-cast-function-type',
+    'winhttp.c', 'winhttp.def', '-o', 'winhttp.dll', '-Wl,--no-insert-timestamp,--image-base,0x180000000,--entry,DllMain',
+    '-lkernel32', '-lmsvcrt', '-lgcc'],
     { cwd: work, stdio: 'inherit', env: { ...process.env, SOURCE_DATE_EPOCH: '0' } });
   const dll = await fs.readFile(path.join(work, 'winhttp.dll'));
   if (hash(dll) !== manifest.dllSHA256) throw Error('Built DLL differs from the accepted candidate; validate before changing the manifest.');
@@ -35,7 +40,7 @@ try {
   await fs.writeFile(path.join(output, 'winhttp.dll'), dll, { flag: 'wx', mode: 0o644 });
   await fs.writeFile(path.join(output, 'build-receipt.json'), JSON.stringify({
     pack: manifest.id, dllSHA256: hash(dll), toolchain: manifest.toolchain, sources: manifest.sources,
-    sourcePathPolicy: 'relative-inputs-v1', gameCodeIncluded: false, gameLaunched: false,
+    sourcePathPolicy: 'relative-inputs-stripped-v2', entryPoint: 'DllMain', gameCodeIncluded: false, gameLaunched: false,
   }, null, 2) + '\n', { flag: 'wx' });
   console.log(`${manifest.id}: accepted DLL reproduced.`);
 } finally { await fs.rm(work, { recursive: true, force: true }); }

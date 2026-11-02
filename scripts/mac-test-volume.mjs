@@ -18,6 +18,7 @@ export async function detachMacTestVolume(mountpoint, {
       run('hdiutil', ['detach', mountpoint]);
       return;
     } catch (error) {
+      let detachPending = false;
       // A busy detach may finish while hdiutil is returning its error. Never
       // infer completion from the next error alone: require a valid inventory
       // proving that both our exact image and mountpoint are absent.
@@ -41,9 +42,13 @@ export async function detachMacTestVolume(mountpoint, {
           }
         }
         if (!attached) return;
+        // Disk Arbitration may have removed the mountpoint while the backing
+        // image is still detaching. Keep requiring authoritative absence, but
+        // allow that transient state the same bounded grace period as EBUSY.
+        detachPending = true;
       }
-      if (error.status !== 16 || attempt === 4) throw error;
-      log('The disposable Mac test volume is busy; retrying its normal detach.');
+      if ((!detachPending && error.status !== 16) || attempt === 4) throw error;
+      log('The disposable Mac test volume is still attached; retrying its normal detach.');
       await wait(250 * 2 ** attempt);
     }
   }

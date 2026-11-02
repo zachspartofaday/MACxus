@@ -41,8 +41,12 @@ node source/build.mjs --out /path/to/new-output-directory
 ```
 
 The output directory must not exist. `CC` can select the compiler executable.
-The build uses relative input names, an explicit PE image base and a zero PE
-timestamp. It verifies source hashes and the accepted output hash. Different
+The build uses relative input names, an explicit PE image base, a zero PE
+timestamp and link-time stripping. Its entry point is the existing C `DllMain`;
+there is no TLS, constructor or CRT-managed state to initialize. C helpers are
+imported from `msvcrt`, and the compiler's stack-probe helper is linked explicitly.
+This avoids bottle-specific CRT startup objects. It verifies source hashes and
+the accepted output hash. Different
 compiler versions or changed sources require new validation before updating the
 manifest. This proves reproduction with the recorded compiler, not a clean
 compiler/toolchain rebuild. No SDK, game installation or network access is used.
