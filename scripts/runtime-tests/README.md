@@ -98,6 +98,16 @@ The runtime does not provide a unique platform device identifier.
   with two isolated device roots and a closed memory transport. Checks delayed
   completion, overlapping revisions, failed transfers, durable retries and
   session-release notifications without contacting cloud services.
+- `windows-title-auth-probe.c`: compiles the actual legacy Windows title-token helper
+  with a closed synthetic HTTP/JSON transport. Checks retained device/proof key,
+  TitleId payload, refused/empty/malformed replies, zero identity and escaped input.
+- `title-endpoint-probe.c`: compiles the production wildcard/endpoint lookup and
+  policy-table growth. Checks title-specific/path precedence, relocated existing
+  policy pointers, overflow, WebSocket upgrades and host/scheme boundaries.
+- `preferred-udp-port-probe.c`: compiles the synchronous networking adapter and
+  checks rejected null output and a successful zero/no-platform-preference result.
+  These three probes use no Xbox account, game or live network. Their generated
+  source includes are test-only and are never packaged.
 - `user-audio-probe.c`: communication audio endpoint getters and notification
   lifetime using the actual helper, a closed MMDevice source and real task queues.
   Covers Unicode, missing devices, failed initialization, queue cancellation,
