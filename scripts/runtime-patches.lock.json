@@ -207,6 +207,10 @@
     {
       "file": "assets/xgameruntime-windows-title-auth.patch",
       "sha256": "3dce89d378b528372efd5067a2d34f87debe4a51fcc75e7b42d7f7b8b1563463"
+    },
+    {
+      "file": "assets/xgameruntime-installed-chunk-readiness.patch",
+      "sha256": "b66f9a94c392f6bc7c46f0054119a5483377c6f8005e62be1594acc0dea5b96b"
     }
   ],
   "expectedWineSources": {
@@ -230,8 +234,8 @@
     "dlls/xgameruntime/xgamesave-transactions.h": "c4ecbbcfd0dec8af931bf033f3e7612e0e62e123231245d33d614c8f3e1b764b",
     "dlls/xgameruntime/xgamesave.idl": "544319e88951f65b21c74f785fb9376c10cac8b1d57e98c7aa3079348162ccab",
     "dlls/xgameruntime/xnetworking.c": "92764313b569503e293e5c1b1cc4c03dd67ed4091600f479fd1298cc6f6864ca",
-    "dlls/xgameruntime/xpackage.c": "5aa7f3a1431963c2d5f2371f1ad85c052fc589bf2bb759154ae62300e91233b7",
-    "dlls/xgameruntime/xpackage_content.h": "d3addb58053e44848bfb2be29d3568019196568ad98b605544b3506c03ed1c2f",
+    "dlls/xgameruntime/xpackage.c": "e84339c05b350a27eacb81845ca84ca8a6b6a8b3710d8716cb5093ddd1b85e48",
+    "dlls/xgameruntime/xpackage_content.h": "91739b737a312dc9208577579978f1b1924ef075e3e6e604e30769aa9c96440f",
     "dlls/xgameruntime/xpackage.idl": "189df1454b50e4cdf874592c6c5309985419c0ec20c5bf3dc69dba4bb62accde",
     "dlls/xgameruntime/xpersistentlocalstorage.c": "48111212dcfe4ef328fa482dc8b426ef853b7c961d575aefeaa3b559788809b2",
     "dlls/xgameruntime/xstore.c": "323183e6c7b6f627888dcd6c7d9be90bc1bf43cb8677b3be4fb06a1539947a5b",
@@ -250,7 +254,7 @@
     "dlls/xgameruntime/userprovider.idl": "66fb09670b7dabfc55257475094239018ea9a19ec2be348e56cf2b17ef615d7a",
     "dlls/xgameruntime/xgamesavefiles.h": "5f21c809107e8c67659899a43f98143a4cbba744be5731cc5c68c177fdc7956a",
     "dlls/xgameruntime/xstore_game_license.h": "8bcc2fd256c3e08ba59d9d5211ffb6f70e01a95cef6d0272ddf61bb8d284bffb",
-    "dlls/xgameruntime/xpackage_chunks.h": "7e62bdb9ea50c36d12e3dd208debf9b5fc75bd266f07141475bbad9afaaf11e6",
+    "dlls/xgameruntime/xpackage_chunks.h": "8d1da784ffaf8d50883830a6ce128c127dac5f6320c6f678e57ff4cdc922618e",
     "dlls/xgameruntime/xpackage_monitors.h": "0ee4bf63bee0c907e395fa2bf347cf2634dd9960c7f08e8e84d92a6be1b8b86e"
   },
   "runtimeCompatibilitySources": {
@@ -280,6 +284,7 @@
     "Single HTTP/2 stream per connection; chunked uploads and proxy/client-certificate transport gaps",
     "Wine assertion observed after manual game exit; cause unresolved",
     "No multiplayer match or all-title compatibility claim",
-    "Legacy Windows TitleId authentication uses the retained device/proof-key chain and authenticated title endpoint policies. This source increment is not a published runtime or a blanket multiplayer compatibility claim."
+    "Legacy Windows TitleId authentication uses the retained device/proof-key chain and authenticated title endpoint policies. This source increment is not a published runtime or a blanket multiplayer compatibility claim.",
+    "Current-package chunk readiness validates full-size bounded layouts and installed payload without depending on sibling-package discovery. This does not grant ownership, implement downloads, or publish a runtime release."
   ]
 }

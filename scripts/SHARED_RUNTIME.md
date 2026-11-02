@@ -439,3 +439,21 @@ the runtime's sibling source/build layout and compiles stripped PE fixtures unde
 two different absolute roots. Locked source reproduction is verified separately;
 these checks do not claim byte-identical complete runtimes across toolchains or
 dependency builds.
+
+### Installed current-package chunk readiness
+
+`xgameruntime-installed-chunk-readiness.patch` validates the current executable's
+matching on-disk config/Appx identity and bounded chunk layout before attempting
+related-package discovery. An unrelated crowded parent directory therefore cannot
+make an installed current package fail its readiness query. Large base-game layouts
+use a 16 MiB XML bound, 65,536 FileGroups and 131,072 visited entries; identity and
+related-content XML keep the existing 1 MiB bound. DestinationPath resolves payload
+inside the installation, including layouts containing obsolete build-machine
+SourcePaths. Missing files, traversal, ambiguous/invalid layouts and unrelated
+package-discovery limits remain failures.
+
+The account-free package-content regression includes relocated source paths, a
+layout larger than 1 MiB, missing payload, invalid destinations, duplicate chunks
+and a crowded discovery root. This source increment neither grants a license nor
+implements downloads, mounting or a runtime release. Original-installation anchors
+for transient launch views and add-on discovery remain separate work.

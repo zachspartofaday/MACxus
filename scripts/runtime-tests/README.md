@@ -69,6 +69,10 @@ The runtime does not provide a unique platform device identifier.
   validation through the real package ABI. Already-installed chunks need no
   reordering; empty package identifiers are rejected, not treated as the current
   package. These checks do not establish a title's startup compatibility.
+  Current-package regressions also cover build-machine SourcePath relocation via
+  DestinationPath, a layout over 1 MiB, missing payload, traversal/empty/duplicate
+  layouts, and a crowded sibling-discovery root. The current package must remain
+  ready while unknown or unrelated package discovery still enforces its bounds.
   Uses only synthetic files in a disposable prefix, without accounts or licensing.
   File presence checks are not a full package-integrity or ownership verification.
 - `package-legacy-probe.c`: independent raw x64 COM-slot checks for the legacy
