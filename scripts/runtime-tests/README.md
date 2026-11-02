@@ -107,7 +107,13 @@ The runtime does not provide a unique platform device identifier.
   TitleId payload, refused/empty/malformed replies, zero identity and escaped input.
 - `title-endpoint-probe.c`: compiles the production wildcard/endpoint lookup and
   policy-table growth. Checks title-specific/path precedence, relocated existing
-  policy pointers, overflow, WebSocket upgrades and host/scheme boundaries.
+  policy pointers, overflow, WebSocket upgrades, catch-all/trailing-star
+  backtracking, DNS case and host/scheme boundaries.
+- `user-privilege-probe.c --refusal-only`: exercises the production diagnostic
+  scanner and a closed synthetic HTTP-400 transport. Rejects malformed numeric
+  JSON and unsupported nested/escaped-key objects. The contract runner enables
+  Wine's `trace+web` channel and checks complete stdout/stderr for response-body
+  markers, including a message and redirect that must never be emitted.
 - `preferred-udp-port-probe.c`: compiles the synchronous networking adapter and
   checks rejected null output and a successful zero/no-platform-preference result.
   These three probes use no Xbox account, game or live network. Their generated

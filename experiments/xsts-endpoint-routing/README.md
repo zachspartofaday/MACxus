@@ -41,6 +41,14 @@ code, account data, game-specific routing rules or runtime path constants.
   error bodies cover numeric bounds, malformed/type-mismatched values and keeping
   messages/redirects out of the new diagnostic output. Privilege refusals remain
   failures.
+- The initial local review found that calling Wine's JSON decoder leaks the
+  error body under `trace+web` and accepts malformed numeric JSON. The replacement
+  scanner accepts a deliberately small flat-object format, performs strict
+  integer/UTF-8/string syntax checks, and never sends the body to a framework
+  parser. Unsupported shapes produce no metadata. The refusal-only Wine test
+  checks combined stdout/stderr with `trace+web` enabled; the old candidate is
+  retained as a negative control. Native ASan/UBSan mutation checks additionally
+  compare accepted inputs with Python's JSON decoder.
 - The build retains the existing macOS GS last-error header correction for its
   local component checks. This host-specific input is separate from the shared
   source patch.

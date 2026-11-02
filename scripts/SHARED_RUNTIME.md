@@ -429,7 +429,13 @@ An authorization failure during a token request also records whether endpoint
 metadata matched or the existing fallback was used. No response message,
 redirect URL, token or account identity is added to these diagnostics. Missing,
 malformed, fractional or out-of-range `XErr` values are ignored, and responses
-larger than 16 KiB are not parsed for diagnostics. A refusal stays a failure;
+larger than 16 KiB are not parsed for diagnostics. A silent scanner accepts only
+flat UTF-8 objects with unescaped keys, a canonical unsigned-integer `XErr`, and
+string/unsigned-integer/boolean/null values for other fields. Nested values,
+escaped keys and other unsupported shapes produce no error-code metadata.
+The scanner makes no calls to Wine's JSON parser, whose own tracing includes
+its complete input. The refusal-only probe checks complete stdout/stderr with
+`trace+web` enabled. A refusal stays a failure;
 there is no audience substitution or automatic removal of a title claim.
 
 The endpoint and privilege probes compile the production helpers using

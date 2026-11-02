@@ -65,6 +65,17 @@ try {
       if (finish.code || finish.timedOut) throw new Error(`File-provider shutdown failed; see ${root}`);
     }
   }
+  // Exercise refusal parsing separately: success-path JSON tracing is outside
+  // this check, while the synthetic error's full stdout/stderr must stay clean.
+  const refusal = await run(wine, [path.join(tests, 'user-privilege-probe.exe'), '--refusal-only'], 60000,
+    { WINEDEBUG: '-all,trace+web' });
+  await fs.writeFile(path.join(root, 'xsts-refusal-trace.log'), refusal.output, { mode: 0o600 });
+  const refusalSummary = refusal.output.split(/\r?\n/).filter(line => /^(FAIL |REFUSAL_CHECKS )/.test(line));
+  const responseLeaked = refusal.output.includes('RESPONSE_BODY_MUST_STAY_PRIVATE') ||
+    refusal.output.includes('response-private.example.test');
+  results.push({ name: 'xsts-refusal-trace', code: refusal.code, timedOut: refusal.timedOut, responseLeaked, summary: refusalSummary });
+  console.log(`xsts-refusal-trace: exit=${refusal.code} timeout=${refusal.timedOut}\n${refusalSummary.join('\n')}`);
+  if (refusal.code !== 0 || refusal.timedOut || responseLeaked) throw new Error(`XSTS refusal privacy probe failed; see ${root}`);
   const pgs = await run(wine, [path.join(tests, 'playfab-folder/playfab-folder-probe.exe')], 60000,
     { WINEDLLOVERRIDES: `${env.WINEDLLOVERRIDES};xgameruntime=n;playfabgamesave=n;nexus_pgs_native=n` });
   await fs.writeFile(path.join(root, 'playfab-folder.log'), pgs.output, { mode: 0o600 });
