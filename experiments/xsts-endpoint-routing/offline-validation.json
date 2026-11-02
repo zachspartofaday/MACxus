@@ -64,7 +64,7 @@
     }
   ],
   "runtimeToolTests": {
-    "passed": 39,
+    "passed": 42,
     "skipped": 7,
     "failed": 0
   },
@@ -108,6 +108,13 @@
     "reviewedOriginal": "6190fdad14ca8a96cf4c71914817ac840844576b",
     "P1": "No body is passed to Wine/COM JSON parsers. Complete refusal stdout/stderr checked with trace+web; old implementation leaks the marker, replacement does not.",
     "P3": "Canonical integer grammar, whole flat-object structure, string escapes, UTF-8 and bounds validated locally; malformed/unsupported shapes omit metadata. Refusal still fails.",
-    "linuxContractRunnerTraceGate": "Added; syntax checked locally, full Linux runner not executed here."
+    "linuxContractRunnerTraceGate": "Added; syntax checked locally, full Linux runner not executed here.",
+    "secondReviewedCandidate": "75464ea615adf4db989911197ed6278b2c4d7665",
+    "productionRecheck": "No production correctness, bounds/UB or refusal-body leakage defect found; prior P1/P3 resolved.",
+    "P3CaptureTruncation": "Output collector retains an explicit truncation flag; privacy gate fails on truncation. New focused tests cover a marker beyond 512000 characters, same-chunk and split-chunk overflow, split markers, and clean/failure/timeout outcomes."
+  },
+  "outputCaptureTests": {
+    "passed": 3,
+    "failed": 0
   }
 }

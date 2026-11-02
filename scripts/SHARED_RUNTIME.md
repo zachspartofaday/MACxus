@@ -435,7 +435,7 @@ string/unsigned-integer/boolean/null values for other fields. Nested values,
 escaped keys and other unsupported shapes produce no error-code metadata.
 The scanner makes no calls to Wine's JSON parser, whose own tracing includes
 its complete input. The refusal-only probe checks complete stdout/stderr with
-`trace+web` enabled. A refusal stays a failure;
+`trace+web` enabled and fails if captured output is truncated. A refusal stays a failure;
 there is no audience substitution or automatic removal of a title claim.
 
 The endpoint and privilege probes compile the production helpers using

@@ -113,7 +113,8 @@ The runtime does not provide a unique platform device identifier.
   scanner and a closed synthetic HTTP-400 transport. Rejects malformed numeric
   JSON and unsupported nested/escaped-key objects. The contract runner enables
   Wine's `trace+web` channel and checks complete stdout/stderr for response-body
-  markers, including a message and redirect that must never be emitted.
+  markers, including a message and redirect that must never be emitted. Truncated
+  capture fails the check, even if the marker lies beyond retained output.
 - `preferred-udp-port-probe.c`: compiles the synchronous networking adapter and
   checks rejected null output and a successful zero/no-platform-preference result.
   These three probes use no Xbox account, game or live network. Their generated
