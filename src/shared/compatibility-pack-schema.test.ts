@@ -7,7 +7,8 @@ const route = (manifest: typeof reference) => Object.fromEntries(['id', 'storeId
 describe('compatibility pack metadata boundaries', () => {
   it('accepts the bundled catalog and Halo manifest', () => {
     const catalog = parseCompatibilityCatalog(JSON.parse(readFileSync(new URL('../../assets/compatibility-packs/catalog.json', import.meta.url), 'utf8')));
-    expect(parseCompatibilityManifest(reference, catalog.packs[0]).id).toBe('halo-preview-media-v1');
+    expect(catalog.schemaVersion).toBe(1);
+    expect(parseCompatibilityManifest(reference, route(reference) as Parameters<typeof parseCompatibilityManifest>[1]).id).toBe('halo-preview-media-v1');
   });
   it.each([
     ['id', '../escape'], ['id', 'CASE-COLLISION'], ['schemaVersion', 2], ['kind', 'shell-script'], ['recipe', 'download-and-execute'], ['buildPathPolicy', 'absolute-source'], ['buildPathPolicy', undefined],

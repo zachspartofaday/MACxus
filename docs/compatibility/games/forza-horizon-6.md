@@ -13,7 +13,47 @@ Compare individual test configurations. No report overrides another or applies t
 
 | Result / details | Layer / version | macOS | Chip | Graphics | Tested scope |
 | --- | --- | --- | --- | --- | --- |
+| [⚠️ Works with limits](#en-forza-horizon-6-highball-m1max-mac9) | Highball engine-wine-11.0-20261014T003801Z | 27.2 | M1 Max | D3DMetal | Menu, Gameplay |
 | [❌ Fails](#en-forza-horizon-6-highball-m1max) | Highball | Not reported | M1 Max | Not reported | Menu, Gameplay |
+
+<a id="en-forza-horizon-6-highball-m1max-mac9"></a>
+### ⚠️ Works with limits · Highball engine-wine-11.0-20261014T003801Z
+
+Loads into the world and saves. 150–300 ms freezes about every 1.3 s after the title menu; one FHE11 crash during the first world load.
+
+| Environment | Reported value |
+| --- | --- |
+| Layer/version | Highball engine-wine-11.0-20261014T003801Z |
+| Architecture | x86&#95;64 / Rosetta |
+| macOS | 27.2 |
+| Chip | M1 Max |
+| Mac model / memory | Not reported |
+| Graphics backend/version | D3DMetal 4.0b3 |
+| MACxus build | 0.3.11-mac.9 |
+| Runtime build | 11.0-20261022-gf4adc821 |
+| Game version | 3.461.691.0 |
+| Test date | 2026-10-27 |
+| Test scope | Menu, Gameplay |
+
+**Feature checks (within the stated scope)**
+
+| Launch | Gameplay | Video | Audio | Online |
+| --- | --- | --- | --- | --- |
+| Passed | Issues | Not reported | Passed | Not reported |
+
+Controller tests: **not reported**.
+
+**Required settings / patches**
+
+- MACxus 0.3.11-mac.9 or later: the Forza Horizon 6 profile turns AVX off and the d3d12 shim on; every Mac prefix gets concrt140 native and the Gaming Services version; cloud saves use the Nexus PlayFab proxy.
+
+**Evidence**
+
+- [Maintainer report 1](<https://github.com/fladnaG86/MACxus/blob/main/docs/DISCOVERIES.md#19-forza-horizon-6-on-m1-max-five-blockers-in-a-row>)
+
+Report ID: `forza-horizon-6-highball-m1max-mac9`
+
+[↑ Index / Indice](../../COMPATIBILITY.md)
 
 <a id="en-forza-horizon-6-highball-m1max"></a>
 ### ❌ Fails · Highball
@@ -56,7 +96,47 @@ Confronta le singole configurazioni provate. Nessun resoconto annulla gli altri 
 
 | Risultato / dettagli | Motore / versione | macOS | Chip | Grafica | Ambito provato |
 | --- | --- | --- | --- | --- | --- |
+| [⚠️ Funziona con limiti](#it-forza-horizon-6-highball-m1max-mac9) | Highball engine-wine-11.0-20261014T003801Z | 27.2 | M1 Max | D3DMetal | Menu, Gioco |
 | [❌ Non funziona](#it-forza-horizon-6-highball-m1max) | Highball | Non riportato | M1 Max | Non riportato | Menu, Gioco |
+
+<a id="it-forza-horizon-6-highball-m1max-mac9"></a>
+### ⚠️ Funziona con limiti · Highball engine-wine-11.0-20261014T003801Z
+
+Entra nel mondo e salva. Blocchi da 150–300 ms circa ogni 1,3 s dopo il menu iniziale; un crash FHE11 durante il primo caricamento del mondo.
+
+| Ambiente | Valore riportato |
+| --- | --- |
+| Motore/versione | Highball engine-wine-11.0-20261014T003801Z |
+| Architettura | x86&#95;64 / Rosetta |
+| macOS | 27.2 |
+| Chip | M1 Max |
+| Modello Mac / memoria | Non riportato |
+| Backend grafico/versione | D3DMetal 4.0b3 |
+| Build MACxus | 0.3.11-mac.9 |
+| Build runtime | 11.0-20261022-gf4adc821 |
+| Versione gioco | 3.461.691.0 |
+| Data prova | 2026-10-27 |
+| Ambito prova | Menu, Gioco |
+
+**Verifiche funzionali (nell’ambito indicato)**
+
+| Avvio | Gioco | Video | Audio | Online |
+| --- | --- | --- | --- | --- |
+| Verificato | Problemi | Non riportato | Verificato | Non riportato |
+
+Prove controller: **non riportate**.
+
+**Impostazioni / patch richieste**
+
+- MACxus 0.3.11-mac.9 o successivo: il profilo di Forza Horizon 6 spegne AVX e accende lo shim d3d12; ogni prefix Mac riceve concrt140 nativa e la versione dei Gaming Services; i salvataggi cloud usano il proxy PlayFab di Nexus.
+
+**Fonti**
+
+- [Resoconto manutentore 1](<https://github.com/fladnaG86/MACxus/blob/main/docs/DISCOVERIES.md#19-forza-horizon-6-on-m1-max-five-blockers-in-a-row>)
+
+Report ID: `forza-horizon-6-highball-m1max-mac9`
+
+[↑ Index / Indice](../../COMPATIBILITY.md)
 
 <a id="it-forza-horizon-6-highball-m1max"></a>
 ### ❌ Non funziona · Highball

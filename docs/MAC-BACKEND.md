@@ -45,9 +45,11 @@ MACXUS_SIGNING_IDENTITY='Developer ID Application: Your Name (TEAMID)' npm run d
 ```
 
 Use the exact identity name or its SHA-1 fingerprint from
-`security find-identity -v -p codesigning`. Both executables receive stable
-identifiers (`io.macxus.xodus-cli` and `io.macxus.xodus-service`) and are verified
-against the selected certificate before their hashes are recorded. A missing,
+`security find-identity -v -p codesigning`. `xodus-cli` is signed with the
+identifier `io.macxus.xodus` and copied byte for byte to `xodus-service` (the
+backend picks its role from the file name), so both share one code hash and one
+Keychain grant; both are verified against the selected certificate before their
+hashes are recorded. A missing,
 ambiguous or unusable requested identity fails the build; it never silently
 falls back. An unset variable retains the linker's ad-hoc signatures and requires
 no certificate lookup. PR native checks never use a signing identity.
@@ -59,8 +61,10 @@ does not modify Cargo's build output or run on an end user's Mac. The manual
 hosted workflow uses the ad-hoc default unless the maintainer separately sets up
 certificate provisioning; this change does not install or upload private keys.
 
-Reusing the certificate and identifiers allows Keychain grants to survive backend
-rebuilds. Switching from an older locally built backend can still prompt once.
+Reusing the certificate keeps the signature verifiable, but without an Apple Team
+ID macOS binds each Keychain grant to the binary's code hash, so every rebuilt
+backend prompts again (see DISCOVERIES.md, 18). The backend keeps all secrets in
+one Keychain item, so that is one prompt per binary, not one per item.
 Ad-hoc builds can prompt again after each app update; signing only the backend
 does not sign or notarize the app or remove its Gatekeeper prompts.
 

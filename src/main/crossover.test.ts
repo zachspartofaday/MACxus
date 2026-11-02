@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as processes from './process.js';
-import { MAC_RUNTIME_DLLS, bundledRuntimeDllDirectory, crossOverCandidateRoots, crossOverWrapperScript, findCrossOver, findCrossOverPreview, findCrossOverPreviewFex, installRuntimeDlls, prepareCrossOverRunner, runtimeOverrideDirectory, stripBuiltinMarker, type CrossOverInstall } from './crossover.js';
+import { MAC_PREFIX_SETTINGS, MAC_RUNTIME_DLLS, bundledRuntimeDllDirectory, crossOverCandidateRoots, crossOverWrapperScript, findCrossOver, findCrossOverPreview, findCrossOverPreviewFex, installRuntimeDlls, prepareCrossOverRunner, runtimeOverrideDirectory, stripBuiltinMarker, type CrossOverInstall } from './crossover.js';
 
 const temporary: string[] = [];
 async function tmp(): Promise<string> {
@@ -147,7 +147,7 @@ describe('prepareCrossOverRunner', () => {
 
     const calls = (await readFile(log, 'utf8')).split('\n').filter(Boolean);
     expect(calls.filter((line) => line.startsWith('cxbottle') && line.includes('--create'))).toHaveLength(1);
-    expect(calls.filter((line) => line.includes('reg add'))).toHaveLength(MAC_RUNTIME_DLLS.length);
+    expect(calls.filter((line) => line.includes('reg add'))).toHaveLength(MAC_PREFIX_SETTINGS.length);
     expect(calls.find((line) => line.includes('xgameruntime'))).toContain('native,builtin');
     for (const name of MAC_RUNTIME_DLLS) {
       const copied = await readFile(path.join(bottles, 'xbox/drive_c/windows/system32', name));
@@ -192,8 +192,19 @@ describe('prepareCrossOverRunner', () => {
     await rm(flag);
     await writeFile(log, '');
     await prepareCrossOverRunner(cx, bottles, runtime);
-    expect((await readFile(log, 'utf8')).split('\n').filter((line) => line.includes('reg add'))).toHaveLength(MAC_RUNTIME_DLLS.length);
-    expect((await readFile(marker, 'utf8')).trim().split('\n')).toEqual([...MAC_RUNTIME_DLLS].sort());
+    expect((await readFile(log, 'utf8')).split('\n').filter((line) => line.includes('reg add'))).toHaveLength(MAC_PREFIX_SETTINGS.length);
+    expect((await readFile(marker, 'utf8')).trim().split('\n')).toEqual(MAC_PREFIX_SETTINGS.map((args) => args.join(' ')));
+  });
+});
+
+describe('MAC_PREFIX_SETTINGS', () => {
+  it('adds concrt140 native and the Gaming Services version after the runtime DLL overrides', () => {
+    const lines = MAC_PREFIX_SETTINGS.map((args) => args.join(' '));
+    expect(lines.slice(0, MAC_RUNTIME_DLLS.length)).toEqual(MAC_RUNTIME_DLLS.map((name) => `reg add HKCU\\Software\\Wine\\DllOverrides /v ${name.replace(/\.dll$/, '')} /t REG_SZ /d native,builtin /f`));
+    expect(lines).toContain('reg add HKCU\\Software\\Wine\\DllOverrides /v concrt140 /t REG_SZ /d native,builtin /f');
+    for (const value of ['CurrentVersion', 'AvailableVersion']) {
+      expect(lines).toContain(`reg add HKLM\\SOFTWARE\\Microsoft\\GamingServices /v ${value} /t REG_QWORD /d 0x0026007569790000 /f /reg:64`);
+    }
   });
 });
 
@@ -258,7 +269,7 @@ describe('installRuntimeDlls overrides', () => {
     const logs: string[] = [];
     await prepareCrossOverRunner(cx, bottles, { dir: runtime, overrideDir: overrides }, 'd3dmetal', (line) => logs.push(line));
     expect((await readFile(path.join(bottles, 'xbox/drive_c/windows/system32/xgameruntime.dll'))).subarray(128).toString()).toBe('patched');
-    expect((await readFile(log, 'utf8')).split('\n').filter((line) => line.includes('reg add'))).toHaveLength(MAC_RUNTIME_DLLS.length);
+    expect((await readFile(log, 'utf8')).split('\n').filter((line) => line.includes('reg add'))).toHaveLength(MAC_PREFIX_SETTINGS.length);
     expect(logs.join('\n')).toContain('xgameruntime.dll');
   });
 });

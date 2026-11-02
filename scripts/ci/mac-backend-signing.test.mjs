@@ -32,21 +32,21 @@ test('an untrusted self-signed certificate listed twice is still one exact ident
   assert.equal(resolveMacSigningIdentity('MACxus Local Signing', () => untrusted + `\n  2) ${selfSigned} "MACxus Local Signing" (CSSMERR_TP_NOT_TRUSTED)`), selfSigned);
 });
 
-test('both shipping binaries receive stable identifiers and are verified against the selected certificate', () => {
-  const calls = [];
-  signMacBackend('/bundle', fingerprint, (command, args) => { calls.push([command, args]); return ''; });
-  assert.deepEqual(calls.slice(0, 2), ['xodus-cli', 'xodus-service'].map(name => ['codesign', [
-    '--force', '--sign', fingerprint, '--identifier', `io.macxus.${name}`, `/bundle/${name}`,
+test('xodus-cli is signed once with one identifier and copied byte for byte to xodus-service, then both are verified', () => {
+  const calls = [], copies = [];
+  signMacBackend('/bundle', fingerprint, (command, args) => { calls.push([command, args]); return ''; }, (from, to) => copies.push([from, to]));
+  assert.deepEqual(calls[0], ['codesign', ['--force', '--sign', fingerprint, '--identifier', 'io.macxus.xodus', '/bundle/xodus-cli']]);
+  assert.deepEqual(copies, [['/bundle/xodus-cli', '/bundle/xodus-service']]);
+  assert.deepEqual(calls.slice(1), ['xodus-cli', 'xodus-service'].map(name => ['codesign', [
+    '--verify', '--strict', '--test-requirement', `=identifier "io.macxus.xodus" and certificate leaf = H"${fingerprint}"`, `/bundle/${name}`,
   ]]));
-  assert.deepEqual(calls.slice(2), ['xodus-cli', 'xodus-service'].map(name => ['codesign', [
-    '--verify', '--strict', '--test-requirement', `=identifier "io.macxus.${name}" and certificate leaf = H"${fingerprint}"`, `/bundle/${name}`,
-  ]]));
+  assert.equal(calls.length, 3);
 });
 
 test('macOS compiles both generated code requirements as literal text', { skip: process.platform !== 'darwin' }, () => {
   verifyMacBackendSigning('/bundle', fingerprint, (_command, args) => {
     const parsed = execFileSync('/usr/bin/csreq', ['-r', args[3], '-t'], { encoding: 'utf8' });
-    assert.match(parsed, /identifier "io\.macxus\.xodus-(?:cli|service)"/);
+    assert.match(parsed, /identifier "io\.macxus\.xodus"/);
     assert.match(parsed, /certificate leaf = H"abab/i);
   });
 });
@@ -54,7 +54,7 @@ test('macOS compiles both generated code requirements as literal text', { skip: 
 test('missing certificates, failed signing and mismatched signatures stop the build without fallback', () => {
   const failure = () => { throw Error('Signing unavailable'); };
   assert.throws(() => resolveMacSigningIdentity('requested', failure), /Signing unavailable/);
-  assert.throws(() => signMacBackend('/bundle', fingerprint, failure), /Signing unavailable/);
+  assert.throws(() => signMacBackend('/bundle', fingerprint, failure, () => {}), /Signing unavailable/);
   assert.throws(() => verifyMacBackendSigning('/bundle', fingerprint, failure), /Signing unavailable/);
   assert.throws(() => signMacBackend('/bundle', '-'), /fingerprint/);
 });

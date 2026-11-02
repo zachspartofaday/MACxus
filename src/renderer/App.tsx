@@ -543,10 +543,11 @@ export function AccountGames({ data, toast, selectedId, select, menu, filters, o
     try {
       const next = await window.launcher.getAccountLibrary(kind, refresh ? undefined : visible?.cursor, refresh);
       if (currentIdentity.current !== identity) return;
-      if (!refresh && visible?.cursor && next.cursor === visible.cursor) throw Error(t("Library pagination did not advance. Refresh the library to try again."));
+      const replace = refresh || next.restarted;
+      if (!replace && visible?.cursor && next.cursor === visible.cursor) throw Error(t("Library pagination did not advance. Refresh the library to try again."));
       // This instance is remounted on identity changes, so pending callbacks
       // cannot publish another account's products into the active component.
-      setResult(old => ({ ...next, products: refresh ? next.products : [...(old?.products ?? []), ...next.products.filter(p => !old?.products.some(old => old.productId === p.productId))] }));
+      setResult(old => ({ ...next, products: replace ? next.products : [...(old?.products ?? []), ...next.products.filter(p => !old?.products.some(old => old.productId === p.productId))] }));
     } catch (error) { if (currentIdentity.current === identity) setError(errorMessage(error)); }
     finally { if (currentIdentity.current === identity) setBusy(false); }
   }
@@ -651,6 +652,8 @@ export function GameLaunchToolFields({ value, change, antiCheat = false, mac = f
     <label className="tool-checkbox"><input type="checkbox" checked={value.mangoHud} onChange={event => update({ mangoHud: event.target.checked })} /><span>{t("Enable MangoHud")}</span></label>
     <label className="tool-checkbox"><input type="checkbox" checked={value.gamescope} onChange={event => update({ gamescope: event.target.checked })} /><span>{t("Run in gamescope")}</span></label>
     {value.gamescope ? <label>{t("Gamescope options")}<input value={value.gamescopeArgs} maxLength={2048} placeholder="-W 1920 -H 1080 -f" onChange={event => update({ gamescopeArgs: event.target.value })} /><small>{t("Only options. Nexus adds the game command. MangoHud with gamescope requires mangoapp.")}</small></label> : null}</>}
+    <label>{t("Custom executable")}<input value={value.executable ?? ''} maxLength={260} placeholder="Binaries/WinGDK/Game-WinGDK-Shipping.exe" spellCheck={false} onChange={event => update({ executable: event.target.value })} /></label>
+    <small>{t("Optional path inside the game folder, launched instead of the manifest executable. Useful when a launcher stub refuses to start (for example a Visual C++ check); leave empty to use the manifest.")}</small>
     <label>{t("Launch options")}<textarea rows={3} value={value.launchOptions} maxLength={2048} placeholder={mac ? 'CX_GRAPHICS_BACKEND=dxmt %command% --launcher-skip' : 'PROTON_ENABLE_WAYLAND=1 gamemoderun %command% --launcher-skip'} onChange={event => update({ launchOptions: event.target.value })} /><small>{t(mac ? "On macOS, use NAME=value before %command% and game arguments after it. Quotes are literal; shell expansion and custom wrappers are unsupported. Options apply to this game only; graphics support depends on the selected engine." : "NAME=value and wrappers before %command%, game arguments after it. Quotes are supported, not shell expansion. Variables are passed to Wine; Proton-script-only options depend on runtime support.")}</small></label>
     {mac ? null : <small>{t("Tools must already be installed. Applies to this game and its shortcuts, not the launcher.")}</small>}
   </fieldset>;
@@ -782,7 +785,7 @@ export function LibraryPage({ data, toast, filters, onFiltersChange, selection }
   async function installVc(game: Game) {
     try {
       await window.launcher.installGameVcRuntime(game.id);
-      toast({ kind: 'success', message: t("Microsoft VC++ is ready in this game’s Proton prefix. Press Play.") });
+      toast({ kind: 'success', message: t(data.platform === 'darwin' ? "Microsoft VC++ is ready in this game’s Wine bottle. Press Play." : "Microsoft VC++ is ready in this game’s Proton prefix. Press Play.") });
     } catch (error) { toast({ kind: 'error', message: errorMessage(error) }); }
   }
 

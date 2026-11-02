@@ -1,0 +1,579 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index f8189f48..a418f937 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -7202,6 +7202,7 @@ dependencies = [
+  "uuid",
+  "wry",
+  "xodus",
++ "xodus-service",
+ ]
+ 
+ [[package]]
+diff --git a/crates/xodus-cli/Cargo.toml b/crates/xodus-cli/Cargo.toml
+index e6879405..40127a80 100644
+--- a/crates/xodus-cli/Cargo.toml
++++ b/crates/xodus-cli/Cargo.toml
+@@ -6,6 +6,7 @@ default-run = "xodus-cli"
+ 
+ [dependencies]
+ xodus = { path = "../xodus" }
++xodus-service = { path = "../xodus-service" }
+ msixvc = { path = "../msixvc" }
+ eappx = { git = "https://github.com/tuxuser/eappx-rs" }
+ base64 = { workspace = true }
+diff --git a/crates/xodus-cli/src/main.rs b/crates/xodus-cli/src/main.rs
+index c76096cc..df7722b7 100644
+--- a/crates/xodus-cli/src/main.rs
++++ b/crates/xodus-cli/src/main.rs
+@@ -10,6 +10,7 @@ mod commands;
+ mod license;
+ mod package;
+ mod package_plan;
++mod role;
+ #[cfg(feature = "native-webview")]
+ mod webview;
+ #[cfg(not(feature = "native-webview"))]
+@@ -206,6 +207,11 @@ struct CliArgs {
+ 
+ #[tokio::main]
+ async fn main() -> ExitCode {
++    // Same binary as xodus-service on macOS; see role.rs.
++    if role::is_service(std::env::current_exe().ok().as_deref()) {
++        xodus_service::serve().await;
++        return ExitCode::SUCCESS;
++    }
+     let filter = tracing_subscriber::EnvFilter::from_env("XODUS_LOG");
+     let registry =
+         tracing_subscriber::registry().with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_filter(filter));
+diff --git a/crates/xodus-cli/src/role.rs b/crates/xodus-cli/src/role.rs
+new file mode 100644
+index 00000000..d2adffaa
+--- /dev/null
++++ b/crates/xodus-cli/src/role.rs
+@@ -0,0 +1,27 @@
++//! One binary, two roles. The shipping macOS bundle copies `xodus-cli` to
++//! `xodus-service` byte for byte, so both share one code hash and one
++//! Keychain grant; the role comes from the executable's file name.
++
++use std::path::Path;
++
++/// True when this executable should run as the Xodus service.
++pub fn is_service(executable: Option<&Path>) -> bool {
++    executable
++        .and_then(Path::file_name)
++        .and_then(|name| name.to_str())
++        .is_some_and(|name| name == "xodus-service")
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn role_follows_the_executable_file_name_only() {
++        assert!(is_service(Some(Path::new("/Applications/MACxus.app/Contents/Resources/backend/xodus-service"))));
++        assert!(!is_service(Some(Path::new("/Applications/MACxus.app/Contents/Resources/backend/xodus-cli"))));
++        assert!(!is_service(Some(Path::new("/tmp/xodus-service-old"))));
++        assert!(!is_service(Some(Path::new("/tmp/xodus-service/xodus-cli"))));
++        assert!(!is_service(None));
++    }
++}
+diff --git a/crates/xodus-service/src/lib.rs b/crates/xodus-service/src/lib.rs
+new file mode 100644
+index 00000000..a466e760
+--- /dev/null
++++ b/crates/xodus-service/src/lib.rs
+@@ -0,0 +1,104 @@
++//! xodus-service as a library, so `xodus-cli` can host it in the same
++//! binary. macOS ties Keychain grants to the binary's code hash and resets an
++//! item's partition list on every update by a non-Team-ID binary; two
++//! binaries writing the same item prompt each other forever. One binary, one
++//! grant (see MACxus docs/DISCOVERIES.md, 18).
++
++use std::fs::Permissions;
++use std::os::unix::fs::PermissionsExt;
++use std::sync::Arc;
++
++use tokio::net::UnixListener;
++use tokio_util::sync::CancellationToken;
++use tracing_subscriber::Layer;
++use tracing_subscriber::layer::SubscriberExt;
++use tracing_subscriber::util::SubscriberInitExt;
++use xodus::tokens::TokenManager;
++
++mod connection;
++mod simple_context;
++mod store_license;
++mod store_updates;
++mod utils;
++
++const XML_MAGIC: u32 = 0x58445358;
++const PROTO_MAGIC: u32 = 0x58445350;
++
++/// Run the Xodus service until Ctrl-C. Exits the process on credential
++/// failures, as the standalone binary always did.
++pub async fn serve() {
++    let filter = tracing_subscriber::EnvFilter::from_env("XODUS_LOG");
++    let registry =
++        tracing_subscriber::registry().with(tracing_subscriber::fmt::layer().with_filter(filter));
++
++    #[cfg(feature = "tokio_console")]
++    {
++        use tracing::level_filters::LevelFilter;
++        use tracing_subscriber::filter::Targets;
++
++        let console_filter = Targets::new()
++            .with_target("tokio", LevelFilter::TRACE)
++            .with_target("runtime", LevelFilter::TRACE);
++        let console_layer = console_subscriber::spawn().with_filter(console_filter);
++        registry.with(console_layer).init();
++    }
++    #[cfg(not(feature = "tokio_console"))]
++    {
++        registry.init();
++    }
++
++    if let Err(error) = xodus::secrets::init_secrets() {
++        xodus::tokens::store::TokenStoreError::from(error).report();
++        std::process::exit(1);
++    }
++    let tokens = Arc::new(TokenManager::with_keychain_and_memory());
++    if let Err(error) =
++        xodus::tokens::device::ensure_device_credentials(&reqwest::Client::new(), &tokens).await
++    {
++        error.report();
++        std::process::exit(1);
++    }
++    let xodus::models::secrets::Token::Legacy(device_token) = (match tokens.get_device_sts_token() {
++        Ok(token) => token,
++        Err(error) => {
++            error.report();
++            std::process::exit(1);
++        }
++    }) else {
++        xodus::tokens::store::TokenStoreError::DeviceAuthentication.report();
++        std::process::exit(1);
++    };
++
++    let runtime_dir = utils::get_runtime_dir();
++    let cancellation = CancellationToken::new();
++    let socket_path = format!("{runtime_dir}/xodus.sock");
++    let trigger = cancellation.clone();
++    tokio::spawn(async move {
++        tokio::signal::ctrl_c()
++            .await
++            .expect("Failure to handle ctrl_c");
++        trigger.cancel();
++    });
++    {
++        let listener = UnixListener::bind(&socket_path).expect("Unable to bind to socket");
++        let mode = 0o600;
++        let perms = Permissions::from_mode(mode);
++        _ = tokio::fs::set_permissions(&socket_path, perms).await;
++        loop {
++            let accept = tokio::select! {
++                r = listener.accept() => r,
++                _ = cancellation.cancelled() => break,
++            }
++            .expect("Failed to accept");
++
++            let token = cancellation.clone();
++            let device_token = device_token.clone();
++            let tokens = tokens.clone();
++            tokio::spawn(async move {
++                connection::router::route(accept.0, token, device_token, tokens).await
++            });
++        }
++    }
++
++    _ = tokio::fs::remove_file(socket_path).await;
++}
+diff --git a/crates/xodus-service/src/main.rs b/crates/xodus-service/src/main.rs
+index ac8d8369..63b4e13f 100644
+--- a/crates/xodus-service/src/main.rs
++++ b/crates/xodus-service/src/main.rs
+@@ -1,97 +1,4 @@
+-use std::fs::Permissions;
+-use std::os::unix::fs::PermissionsExt;
+-use std::sync::Arc;
+-
+-use tokio::net::UnixListener;
+-use tokio_util::sync::CancellationToken;
+-use tracing_subscriber::Layer;
+-use tracing_subscriber::layer::SubscriberExt;
+-use tracing_subscriber::util::SubscriberInitExt;
+-use xodus::tokens::TokenManager;
+-
+-mod connection;
+-mod simple_context;
+-mod store_license;
+-mod store_updates;
+-mod utils;
+-
+-const XML_MAGIC: u32 = 0x58445358;
+-const PROTO_MAGIC: u32 = 0x58445350;
+-
+ #[tokio::main]
+ async fn main() {
+-    let filter = tracing_subscriber::EnvFilter::from_env("XODUS_LOG");
+-    let registry =
+-        tracing_subscriber::registry().with(tracing_subscriber::fmt::layer().with_filter(filter));
+-
+-    #[cfg(feature = "tokio_console")]
+-    {
+-        use tracing::level_filters::LevelFilter;
+-        use tracing_subscriber::filter::Targets;
+-
+-        let console_filter = Targets::new()
+-            .with_target("tokio", LevelFilter::TRACE)
+-            .with_target("runtime", LevelFilter::TRACE);
+-        let console_layer = console_subscriber::spawn().with_filter(console_filter);
+-        registry.with(console_layer).init();
+-    }
+-    #[cfg(not(feature = "tokio_console"))]
+-    {
+-        registry.init();
+-    }
+-
+-    if let Err(error) = xodus::secrets::init_secrets() {
+-        xodus::tokens::store::TokenStoreError::from(error).report();
+-        std::process::exit(1);
+-    }
+-    let tokens = Arc::new(TokenManager::with_keychain_and_memory());
+-    if let Err(error) =
+-        xodus::tokens::device::ensure_device_credentials(&reqwest::Client::new(), &tokens).await
+-    {
+-        error.report();
+-        std::process::exit(1);
+-    }
+-    let xodus::models::secrets::Token::Legacy(device_token) = (match tokens.get_device_sts_token() {
+-        Ok(token) => token,
+-        Err(error) => {
+-            error.report();
+-            std::process::exit(1);
+-        }
+-    }) else {
+-        xodus::tokens::store::TokenStoreError::DeviceAuthentication.report();
+-        std::process::exit(1);
+-    };
+-
+-    let runtime_dir = utils::get_runtime_dir();
+-    let cancellation = CancellationToken::new();
+-    let socket_path = format!("{runtime_dir}/xodus.sock");
+-    let trigger = cancellation.clone();
+-    tokio::spawn(async move {
+-        tokio::signal::ctrl_c()
+-            .await
+-            .expect("Failure to handle ctrl_c");
+-        trigger.cancel();
+-    });
+-    {
+-        let listener = UnixListener::bind(&socket_path).expect("Unable to bind to socket");
+-        let mode = 0o600;
+-        let perms = Permissions::from_mode(mode);
+-        _ = tokio::fs::set_permissions(&socket_path, perms).await;
+-        loop {
+-            let accept = tokio::select! {
+-                r = listener.accept() => r,
+-                _ = cancellation.cancelled() => break,
+-            }
+-            .expect("Failed to accept");
+-
+-            let token = cancellation.clone();
+-            let device_token = device_token.clone();
+-            let tokens = tokens.clone();
+-            tokio::spawn(async move {
+-                connection::router::route(accept.0, token, device_token, tokens).await
+-            });
+-        }
+-    }
+-
+-    _ = tokio::fs::remove_file(socket_path).await;
++    xodus_service::serve().await;
+ }
+diff --git a/crates/xodus/src/lib.rs b/crates/xodus/src/lib.rs
+index a811baec..d3cab8f1 100644
+--- a/crates/xodus/src/lib.rs
++++ b/crates/xodus/src/lib.rs
+@@ -11,6 +11,7 @@ pub mod keyring_unlock;
+ pub mod licensing;
+ pub mod models;
+ pub mod secrets;
++pub mod secrets_bundle;
+ pub mod tokens;
+ 
+ pub const XBOX_LIVE_PACKAGES_PC: &str = "https://packagespc.xboxlive.com";
+diff --git a/crates/xodus/src/secrets.rs b/crates/xodus/src/secrets.rs
+index 50cd8847..2b76b3c2 100644
+--- a/crates/xodus/src/secrets.rs
++++ b/crates/xodus/src/secrets.rs
+@@ -1,4 +1,6 @@
+ pub static SERVICE_NAME: &str = "Xodus Service";
++/// Account of the single Keychain item that bundles every secret on macOS.
++pub static BUNDLE_ACCOUNT: &str = "macxus-secrets";
+ 
+ pub fn init_secrets() -> Result<(), keyring_core::Error> {
+     #[cfg(feature = "key-chain-file")]
+@@ -21,7 +23,10 @@ pub fn init_secrets() -> Result<(), keyring_core::Error> {
+ 
+         #[cfg(target_os = "macos")]
+         {
+-            keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new()?);
++            // One Keychain item for all secrets: one "Always Allow" per binary
++            // instead of one per item (see secrets_bundle.rs).
++            let keychain = apple_native_keyring_store::keychain::Store::new()?;
++            keyring_core::set_default_store(crate::secrets_bundle::BundledStore::new(keychain, SERVICE_NAME, BUNDLE_ACCOUNT));
+         }
+ 
+         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+diff --git a/crates/xodus/src/secrets_bundle.rs b/crates/xodus/src/secrets_bundle.rs
+new file mode 100644
+index 00000000..6f7c7269
+--- /dev/null
++++ b/crates/xodus/src/secrets_bundle.rs
+@@ -0,0 +1,244 @@
++//! One keychain item for every Xodus secret.
++//!
++//! macOS binds Keychain access grants to the exact code hash of the binary
++//! that asks (there is no Team ID in a self-signed MACxus build), and it keeps
++//! one grant per item. Six items read by two binaries meant up to twelve
++//! "Always Allow" dialogs per backend build. Keeping all secrets in one item
++//! reduces that to one grant per binary.
++//!
++//! The bundle is a JSON object `{ "<service>\u{0}<user>": "<base64 secret>" }`
++//! stored as the secret of one inner-store credential. Legacy per-user items
++//! are read once, copied into the bundle and deleted, so an existing sign-in
++//! survives the switch without a new login.
++
++use std::any::Any;
++use std::collections::{BTreeMap, HashMap};
++use std::sync::{Arc, Mutex};
++
++use base64::{Engine as _, engine::general_purpose::STANDARD};
++use keyring_core::api::{CredentialApi, CredentialStoreApi};
++use keyring_core::{Credential, CredentialPersistence, CredentialStore, Entry, Error, Result};
++
++type Bundle = BTreeMap<String, String>;
++
++/// The inner store and the one item that holds every secret.
++struct Shared {
++    inner: Arc<CredentialStore>,
++    service: String,
++    account: String,
++    /// Serializes read-modify-write cycles inside one process. Two backend
++    /// processes (xodus-cli and xodus-service) still race in theory; they
++    /// only write during sign-in and token refresh.
++    lock: Mutex<()>,
++}
++
++impl Shared {
++    fn item(&self) -> Result<Entry> {
++        self.inner.build(&self.service, &self.account, None)
++    }
++
++    fn load(&self) -> Result<Bundle> {
++        match self.item()?.get_secret() {
++            Ok(bytes) => serde_json::from_slice::<Bundle>(&bytes)
++                .map_err(|e| Error::BadDataFormat(bytes.clone(), Box::new(e))),
++            Err(Error::NoEntry) => Ok(Bundle::new()),
++            Err(e) => Err(e),
++        }
++    }
++
++    fn save(&self, bundle: &Bundle) -> Result<()> {
++        if bundle.is_empty() {
++            return match self.item()?.delete_credential() {
++                Ok(()) | Err(Error::NoEntry) => Ok(()),
++                Err(e) => Err(e),
++            };
++        }
++        let bytes = serde_json::to_vec(bundle).map_err(|e| Error::PlatformFailure(Box::new(e)))?;
++        self.item()?.set_secret(&bytes)
++    }
++}
++
++pub struct BundledStore {
++    shared: Arc<Shared>,
++}
++
++impl std::fmt::Debug for BundledStore {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        write!(f, "BundledStore({}/{} over {})", self.shared.service, self.shared.account, self.shared.inner.vendor())
++    }
++}
++
++impl BundledStore {
++    pub fn new(inner: Arc<CredentialStore>, service: &str, account: &str) -> Arc<Self> {
++        let shared = Shared { inner, service: service.to_owned(), account: account.to_owned(), lock: Mutex::new(()) };
++        Arc::new(Self { shared: Arc::new(shared) })
++    }
++}
++
++impl CredentialStoreApi for BundledStore {
++    fn vendor(&self) -> String {
++        format!("MACxus single-item bundle over {}", self.shared.inner.vendor())
++    }
++
++    fn id(&self) -> String {
++        format!("bundle:{}/{}:{}", self.shared.service, self.shared.account, self.shared.inner.id())
++    }
++
++    fn build(&self, service: &str, user: &str, _modifiers: Option<&HashMap<&str, &str>>) -> Result<Entry> {
++        if service == self.shared.service && user == self.shared.account {
++            return Err(Error::Invalid("user".into(), "reserved for the secret bundle itself".into()));
++        }
++        let credential = BundledCredential { shared: self.shared.clone(), service: service.to_owned(), user: user.to_owned() };
++        Ok(Entry::new_with_credential(Arc::new(credential)))
++    }
++
++    fn as_any(&self) -> &dyn Any {
++        self
++    }
++
++    fn persistence(&self) -> CredentialPersistence {
++        self.shared.inner.persistence()
++    }
++}
++
++struct BundledCredential {
++    shared: Arc<Shared>,
++    service: String,
++    user: String,
++}
++
++impl std::fmt::Debug for BundledCredential {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        write!(f, "BundledCredential({}/{})", self.service, self.user)
++    }
++}
++
++impl BundledCredential {
++    fn key(&self) -> String {
++        format!("{}\u{0}{}", self.service, self.user)
++    }
++
++    fn legacy(&self) -> Result<Entry> {
++        self.shared.inner.build(&self.service, &self.user, None)
++    }
++
++    /// A per-user item written by an older backend: read, copy into the
++    /// bundle, delete. A legacy item that cannot be deleted is harmless; the
++    /// bundle wins on every later read.
++    fn migrate_legacy(&self, bundle: &mut Bundle) -> Result<Option<Vec<u8>>> {
++        let legacy = self.legacy()?;
++        let secret = match legacy.get_secret() {
++            Ok(bytes) => bytes,
++            Err(Error::NoEntry) => return Ok(None),
++            Err(e) => return Err(e),
++        };
++        bundle.insert(self.key(), STANDARD.encode(&secret));
++        self.shared.save(bundle)?;
++        let _ = legacy.delete_credential();
++        Ok(Some(secret))
++    }
++}
++
++impl CredentialApi for BundledCredential {
++    fn set_secret(&self, secret: &[u8]) -> Result<()> {
++        let _guard = self.shared.lock.lock().expect("bundle lock poisoned");
++        let mut bundle = self.shared.load()?;
++        bundle.insert(self.key(), STANDARD.encode(secret));
++        self.shared.save(&bundle)
++    }
++
++    fn get_secret(&self) -> Result<Vec<u8>> {
++        let _guard = self.shared.lock.lock().expect("bundle lock poisoned");
++        let mut bundle = self.shared.load()?;
++        match bundle.get(&self.key()) {
++            Some(encoded) => STANDARD.decode(encoded).map_err(|_| Error::BadEncoding(encoded.clone().into_bytes())),
++            None => self.migrate_legacy(&mut bundle)?.ok_or(Error::NoEntry),
++        }
++    }
++
++    fn delete_credential(&self) -> Result<()> {
++        let _guard = self.shared.lock.lock().expect("bundle lock poisoned");
++        let mut bundle = self.shared.load()?;
++        if bundle.remove(&self.key()).is_some() {
++            return self.shared.save(&bundle);
++        }
++        // Not in the bundle: clear a legacy item so a removed sign-in does
++        // not resurface through migration. NoEntry propagates as upstream expects.
++        self.legacy()?.delete_credential()
++    }
++
++    fn get_credential(&self) -> Result<Option<Arc<Credential>>> {
++        self.get_secret().map(|_| None)
++    }
++
++    fn get_specifiers(&self) -> Option<(String, String)> {
++        Some((self.service.clone(), self.user.clone()))
++    }
++
++    fn as_any(&self) -> &dyn Any {
++        self
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use keyring_core::api::CredentialStoreApi;
++    use std::sync::Arc;
++
++    fn bundle() -> (Arc<keyring_core::sample::Store>, Arc<BundledStore>) {
++        let inner = keyring_core::sample::Store::new().unwrap();
++        let store = BundledStore::new(inner.clone(), "Xodus Service", "secrets");
++        (inner, store)
++    }
++
++    #[test]
++    fn credential_bundle_round_trips_several_users_through_one_inner_item() {
++        let (inner, store) = bundle();
++        let a = store.build("Xodus Service", "user-tokens", None).unwrap();
++        let b = store.build("Xodus Service", "device-tokens", None).unwrap();
++        a.set_secret(b"alpha").unwrap();
++        b.set_secret(b"beta\0\xff").unwrap();
++        assert_eq!(a.get_secret().unwrap(), b"alpha");
++        assert_eq!(b.get_secret().unwrap(), b"beta\0\xff");
++        // Only the bundle item exists in the inner store.
++        let item = inner.build("Xodus Service", "secrets", None).unwrap();
++        assert!(item.get_secret().is_ok());
++        assert!(matches!(inner.build("Xodus Service", "user-tokens", None).unwrap().get_secret(), Err(keyring_core::Error::NoEntry)));
++    }
++
++    #[test]
++    fn credential_bundle_reports_no_entry_for_unknown_and_deleted_users() {
++        let (_inner, store) = bundle();
++        let entry = store.build("Xodus Service", "user-DA", None).unwrap();
++        assert!(matches!(entry.get_secret(), Err(keyring_core::Error::NoEntry)));
++        assert!(matches!(entry.delete_credential(), Err(keyring_core::Error::NoEntry)));
++        entry.set_secret(b"x").unwrap();
++        entry.delete_credential().unwrap();
++        assert!(matches!(entry.get_secret(), Err(keyring_core::Error::NoEntry)));
++    }
++
++    #[test]
++    fn credential_bundle_migrates_legacy_per_user_items_on_first_read() {
++        let (inner, store) = bundle();
++        inner.build("Xodus Service", "user-tokens", None).unwrap().set_secret(b"legacy").unwrap();
++        let entry = store.build("Xodus Service", "user-tokens", None).unwrap();
++        assert_eq!(entry.get_secret().unwrap(), b"legacy");
++        // Migrated into the bundle and removed from the legacy item.
++        assert!(matches!(inner.build("Xodus Service", "user-tokens", None).unwrap().get_secret(), Err(keyring_core::Error::NoEntry)));
++        assert_eq!(entry.get_secret().unwrap(), b"legacy");
++    }
++
++    #[test]
++    fn credential_bundle_keeps_other_users_when_one_is_rewritten_or_deleted() {
++        let (_inner, store) = bundle();
++        let a = store.build("Xodus Service", "user-tokens", None).unwrap();
++        let b = store.build("Xodus Service", "user-session", None).unwrap();
++        a.set_secret(b"one").unwrap();
++        b.set_secret(b"two").unwrap();
++        a.set_secret(b"one-v2").unwrap();
++        b.delete_credential().unwrap();
++        assert_eq!(a.get_secret().unwrap(), b"one-v2");
++        assert!(matches!(b.get_secret(), Err(keyring_core::Error::NoEntry)));
++    }
++}

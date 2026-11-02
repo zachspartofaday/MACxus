@@ -196,3 +196,10 @@ it('explains the macOS launch-options contract without advertising custom wrappe
   const linux = renderToStaticMarkup(<GameLaunchToolFields value={defaultLaunchTools} change={() => {}} />);
   expect(linux).toContain('NAME=value and wrappers before');
 });
+
+it('offers a package-relative executable override on every platform and shows the stored value', () => {
+  const html = renderToStaticMarkup(<GameLaunchToolFields value={{ ...defaultLaunchTools, executable: 'Binaries/WinGDK/Game-WinGDK-Shipping.exe' }} change={() => {}} mac />);
+  expect(html).toContain('Custom executable');
+  expect(html).toMatch(/<input[^>]*value="Binaries\/WinGDK\/Game-WinGDK-Shipping\.exe"/);
+  expect(renderToStaticMarkup(<GameLaunchToolFields value={defaultLaunchTools} change={() => {}} />)).toContain('Custom executable');
+});

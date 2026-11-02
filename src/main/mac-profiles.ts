@@ -4,7 +4,7 @@ import type { MacEngine } from '../shared/types.js';
 /** Environment keys a per-game macOS profile may set; anything else is dropped. */
 export const MAC_PROFILE_ENV_KEYS = [
   'D3DM_VENDOR_ID', 'D3DM_DEVICE_ID', 'D3DM_DEVICE_DESCRIPTION', 'D3DM_ENABLE_METALFX',
-  'WINEMSYNC', 'WINEESYNC', 'ROSETTA_ADVERTISE_AVX', 'MTL_HUD_ENABLED',
+  'WINEMSYNC', 'WINEESYNC', 'ROSETTA_ADVERTISE_AVX', 'MTL_HUD_ENABLED', 'HB_D3D12_TSSHIM',
 ] as const;
 const ALLOWED_KEYS = new Set<string>(MAC_PROFILE_ENV_KEYS);
 const VALUE = /^[\w .:+-]{1,64}$/;

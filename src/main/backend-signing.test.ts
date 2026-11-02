@@ -30,8 +30,8 @@ describe('backend signing', () => {
     const manager = make('darwin');
     await (manager as unknown as Internals).signBinaries('/t/xodus-cli', '/t/xodus-service', l => logs.push(l));
     expect(signCalls()).toEqual([
-      ['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus-cli', '/t/xodus-cli'],
-      ['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus-service', '/t/xodus-service'],
+      ['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus', '/t/xodus-cli'],
+      ['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus', '/t/xodus-service'],
     ]);
     expect(manager.current.signingIdentity).toBe(true);
     expect(logs.join('\n')).toMatch(/Firmato/);
@@ -58,7 +58,7 @@ describe('backend signing', () => {
     const internals = manager as unknown as Internals;
     internals.status.source = 'managed'; internals.status.binaryPath = '/m/xodus-cli';
     await manager.ensureSigned();
-    expect(signCalls()).toEqual([['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus-service', '/m/xodus-service']]);
+    expect(signCalls()).toEqual([['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus', '/m/xodus-service']]);
   });
   it('startup without a managed backend only records whether the certificate exists', async () => {
     script({ identity: true });
@@ -81,7 +81,7 @@ describe('backend signing', () => {
     const internals = manager as unknown as Internals;
     internals.status.source = 'managed'; internals.status.binaryPath = '/m/xodus-cli';
     await manager.ensureSigned();
-    expect(signCalls()).toEqual([['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus-cli', '/m/xodus-cli']]);
+    expect(signCalls()).toEqual([['--force', '--sign', HASH, '--identifier', 'io.macxus.xodus', '/m/xodus-cli']]);
   });
   it.each(['updating', 'operation'])('startup never re-signs while busy (%s) but still records the certificate', async kind => {
     script({ identity: true });

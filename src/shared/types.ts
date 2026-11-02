@@ -94,6 +94,8 @@ export interface GameLaunchTools {
   metalHud?: boolean;
   /** CrossOver: expose DLSS through D3DMetal / DXMT for this game only. */
   dlss?: boolean;
+  /** Package-relative executable launched instead of the manifest entry (for example a UE Shipping exe). */
+  executable?: string;
   mangoHud: boolean;
   gamescope: boolean;
   gamescopeArgs: string;
@@ -404,6 +406,8 @@ export interface AccountLibraryPage {
   cursor?: string;
   checkedAt: string;
   skippedEntitlements?: number;
+  /** The requested cursor outlived its snapshot; this is a new first page. */
+  restarted?: boolean;
 }
 
 export interface LauncherApi {

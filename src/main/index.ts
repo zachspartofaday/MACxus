@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, Notification, powerSaveBlocker, screen, shell } from 'electron';
-import { constants, createWriteStream, promises as fs, readFileSync, watch, writeFileSync } from 'node:fs';
+import { constants, createWriteStream, existsSync, promises as fs, readFileSync, watch, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -27,7 +27,8 @@ import { cloudSaveRuntime, selectedWinePath, startXodusService, storeContentRunt
 import { prepareMacLaunchOptions } from './mac-launch-options.js';
 import { GameLogReducer, gameLoggingEnvironment, gameWindowEnvironment } from './game-log.js';
 import { installedGameBytes } from './installed-size.js';
-import { downloadVerifiedVcRedist, installedVcRuntimeVersion, VC_REDIST_VERSION, versionAtLeast } from './vc-runtime.js';
+import { downloadVerifiedVcRedist, installedVcRuntimeVersion, VC_REDIST_VERSION, versionAtLeast, vcInstallAvailability } from './vc-runtime.js';
+import { resolvePackageFile } from './windows-path.js';
 import { assertGameRemovalAvailable, validateGameDeleteTarget } from './game-removal.js';
 import { deleteGameDirectory } from './game-delete.js';
 import { spawnGameProcess, waitForGameExit, type GameProcess } from './game-process.js';
@@ -335,7 +336,9 @@ async function checkGameUpdates(id?: string): Promise<void> {
   const games = id ? store.games.filter(game => game.id === id) : [...store.games];
   if (id && !games.length) throw new Error('Game not found.');
   let session: XodusServiceSession | undefined;
-  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'nexus-updates-'));
+  // The service socket lands four levels below this directory; macOS $TMPDIR is long enough to
+  // push it past the 104-byte sun_path limit (xodus-service panics with exit 101).
+  const temporary = await fs.mkdtemp(path.join(process.platform === 'darwin' ? '/tmp' : os.tmpdir(), 'nexus-updates-'));
   checkingGameUpdates = true;
   gameUpdateController = new AbortController();
   try {
@@ -921,8 +924,7 @@ async function gameLaunchOptions(id: string): Promise<GameLaunchOptions> {
   return {
     cloudSaves: previewRuntime && serviceAvailable,
     cloudReason: !previewRuntime ? 'The selected Wine runtime does not include the cloud-save preview.' : !serviceAvailable ? 'This Xodus backend has no xodus-service.' : undefined,
-    vcInstall: protonAvailable,
-    vcReason: protonAvailable ? undefined : 'VC++ installation requires a full Xodus Proton distribution.',
+    ...vcInstallAvailability(process.platform, protonAvailable),
   };
 }
 
@@ -977,7 +979,11 @@ async function prepareGameLaunch(id: string): Promise<void> {
   if (await unbridgedCloudSaveRuntime(wine)) {
     throw new Error('The active runtime has cloud saves without the required service bridge. Update the active runtime in Settings.');
   }
-  const args = gameLaunchArguments(inspected, wine, store.settings.market, backend.current.linuxRunPatch);
+  const executableOverride = game.launchTools?.executable?.trim();
+  if (executableOverride && !await resolvePackageFile(game.path, executableOverride)) {
+    throw new Error(`The custom executable was not found in the game folder: ${executableOverride}. Fix or clear it in the game settings.`);
+  }
+  const args = gameLaunchArguments({ ...inspected, launchTools: game.launchTools }, wine, store.settings.market, backend.current.linuxRunPatch);
   const operationId = `game-${id}`;
   const dataRoot = path.dirname(store.settings.runtimeRoot);
   const logDirectory = path.join(dataRoot, 'logs');
@@ -1059,6 +1065,7 @@ async function prepareGameLaunch(id: string): Promise<void> {
     const environment = antiCheatEnvironment(gameLocaleEnvironment(gameWindowEnvironment(gameLoggingEnvironment(protonRunner
       ? { ...process.env }
       : { ...process.env, WINEPREFIX: legacyPrefixRoot, WINEARCH: 'win64' }, verboseLogs)), locale));
+    if (executableOverride) addGameLog(`Custom executable: launching ${executableOverride} instead of the manifest entry ${inspected.executable ?? '(none)'}.`);
     if (game.launchTools?.offlineWithoutAntiCheat && offlineAntiCheatLaunch(args, environment, inspected.antiCheat?.executable)) {
       addGameLog(`Offline without anti-cheat: launching ${inspected.antiCheat?.executable} with the EOS Null Client. Online features are unavailable.`);
     }
@@ -1099,6 +1106,9 @@ async function prepareGameLaunch(id: string): Promise<void> {
       environment.XODUS_BRIDGE_KEY = serviceSession.bridgeKey;
       environment.XODUS_SAVE_SYNC = 'auto';
       addGameLog('Xbox cloud save preview is enabled. Saves may download from and upload to the account cloud.');
+      // The Highball wrapper stages it in the launch view, as the runtime's wine-launcher does on Linux.
+      const playFabProxy = path.join(path.dirname(wine), '..', 'share', 'xodus-nexus', 'compat', 'PlayFabGameSave.dll');
+      if (isMac && existsSync(playFabProxy)) environment.NEXUS_PGS_PROXY = playFabProxy;
     }
     if (isMac && protonRunner) addGameLog(`${macEngine === 'highball' ? 'Prefisso Highball' : 'CrossOver bottle'}: ${protonRunner.compatibilityDataPath}`);
     else if (protonRunner) addGameLog(`Proton prefix: ${protonRunner.compatibilityDataPath}/pfx`);

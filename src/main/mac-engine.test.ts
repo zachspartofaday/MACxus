@@ -30,7 +30,7 @@ function deps(cx: CrossOverInstall | undefined, highball: string | undefined, ca
     findCrossOver: async () => cx,
     highballInstalled: () => highball,
     prepareCrossOver: async (_cx, bottles, dlls) => { calls.push(`crossover ${bottles}`, `dlls ${dlls.dir} ${dlls.overrideDir}`); return runner('cx'); },
-    prepareHighball: async (engine, gptk, lib64, bottles, dlls, env, _log, engineOverrides) => { calls.push(`highball ${engine} ${gptk} ${lib64} ${bottles} ${JSON.stringify(env)}`, `dlls ${dlls.dir} ${dlls.overrideDir}`, `engine overrides ${engineOverrides}`); return runner('hb'); },
+    prepareHighball: async (engine, gptk, lib64, bottles, dlls, env, _log, engineOverrides, shim) => { calls.push(`highball ${engine} ${gptk} ${lib64} ${bottles} ${JSON.stringify(env)}`, `dlls ${dlls.dir} ${dlls.overrideDir}`, `engine overrides ${engineOverrides}`, `d3d12 shim ${shim}`); return runner('hb'); },
     profiles: async () => ({ FH6: { engine: 'highball', env: { D3DM_VENDOR_ID: '0x10de' }, note: 'Profilo da highball-db (CC0)' } }),
   };
 }
@@ -124,7 +124,7 @@ describe('prepareMacRunner', () => {
     const result = await prepareMacRunner({ setting: 'crossover', storeId: 'fh6', dataRoot: '/d', runtimeDllDir: '/dll', log: (l) => log.push(l) }, deps(cx, '/hb', calls));
     expect(result.engine).toBe('highball');
     expect(result.profileEnv).toEqual({ D3DM_VENDOR_ID: '0x10de' });
-    expect(calls).toEqual([`highball /hb ${path.join(cx.root, 'lib64/apple_gptk')} ${path.join(cx.root, 'lib64')} /d/bottles {"D3DM_VENDOR_ID":"0x10de"}`, 'dlls /dll /d/runtime-overrides', 'engine overrides /d/highball-overrides']);
+    expect(calls).toEqual([`highball /hb ${path.join(cx.root, 'lib64/apple_gptk')} ${path.join(cx.root, 'lib64')} /d/bottles {"D3DM_VENDOR_ID":"0x10de"}`, 'dlls /dll /d/runtime-overrides', 'engine overrides /d/highball-overrides', 'd3d12 shim /d/highball-d3d12-shim']);
     expect(log.join('\n')).toMatch(/Highball/);
     expect(log.join('\n')).toContain('Profilo da highball-db (CC0)');
   });

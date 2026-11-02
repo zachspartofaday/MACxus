@@ -84,7 +84,8 @@ export class BackendManager {
       log('Certificato «MACxus Local Signing» non trovato: il backend resta con firma ad-hoc e macOS chiederà di nuovo l’accesso al Portachiavi dopo ogni ricompilazione. Vedi Impostazioni per crearlo.');
       return;
     }
-    for (const [binary, identifier] of [[cli, 'io.macxus.xodus-cli'], [service, 'io.macxus.xodus-service']] as const) {
+    // One identifier for both names: see scripts/mac-backend-signing.mjs.
+    for (const [binary, identifier] of [[cli, 'io.macxus.xodus'], [service, 'io.macxus.xodus']] as const) {
       try {
         if (onlyIfUnsigned && await isSignedWithLocalIdentity(binary)) continue;
         await signBackendBinary(binary, identifier, identity);
@@ -376,7 +377,9 @@ export class BackendManager {
       const managedCli = path.join(releaseDir, 'xodus-cli');
       await fs.copyFile(builtCli, managedCli);
       await fs.chmod(managedCli, 0o755);
-      const builtService = path.join(target, 'release', 'xodus-service');
+      // macOS ships xodus-service as a byte-identical copy of xodus-cli (role from
+      // the file name) so both share one code hash and one Keychain grant.
+      const builtService = this.platform === 'darwin' ? builtCli : path.join(target, 'release', 'xodus-service');
       await fs.copyFile(builtService, path.join(releaseDir, 'xodus-service'));
       await fs.chmod(path.join(releaseDir, 'xodus-service'), 0o755);
       await fs.writeFile(path.join(releaseDir, 'metadata.json'), JSON.stringify({ commit, builtAt: new Date().toISOString(), capabilities, linuxRunPatch: backendCompatibility(this.platform) }, null, 2));

@@ -35,3 +35,13 @@ it('defaults DLSS off for older games and validates the per-game IPC value', () 
   expect(normalizeLaunchTools({ ...defaultLaunchTools, dlss: true }).dlss).toBe(true);
   for (const dlss of ['yes', 1, null, {}]) expect(() => normalizeLaunchTools({ ...defaultLaunchTools, dlss })).toThrow('Invalid DLSS setting.');
 });
+
+it('accepts a per-game executable override as a relative package path and drops an empty one', () => {
+  expect(normalizeLaunchTools({ mangoHud: false, gamescope: false, gamescopeArgs: '', launchOptions: '' }).executable).toBeUndefined();
+  expect(normalizeLaunchTools({ ...defaultLaunchTools, executable: '  Binaries/WinGDK/Game-WinGDK-Shipping.exe ' }).executable).toBe('Binaries/WinGDK/Game-WinGDK-Shipping.exe');
+  expect(normalizeLaunchTools({ ...defaultLaunchTools, executable: 'Binaries\\WinGDK\\Game.exe' }).executable).toBe('Binaries/WinGDK/Game.exe');
+  expect(normalizeLaunchTools({ ...defaultLaunchTools, executable: '   ' }).executable).toBeUndefined();
+  for (const executable of ['/abs/Game.exe', 'C:\\Game.exe', '../Game.exe', 'a/../Game.exe', 'Game.dll', 'Game', 'x\0y.exe', 'x\ny.exe', `${'a'.repeat(500)}.exe`, 1, null, {}]) {
+    expect(() => normalizeLaunchTools({ ...defaultLaunchTools, executable })).toThrow('Invalid executable override.');
+  }
+});

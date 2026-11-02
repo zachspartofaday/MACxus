@@ -59,7 +59,7 @@ const oldTmp = env.TMPDIR;
 try {
   env.TMPDIR = fixtureRoot + path.sep;
   cargo(['test', ...features, '-p', 'xodus-cli']);
-  for (const filter of ['credential_', 'content_license_', 'content_ticket_', 'ticket_diagnostic_']) cargo(['test', ...features, '-p', 'xodus', filter]);
+  for (const filter of ['credential_', 'content_license_', 'content_ticket_', 'xbox_ticket_', 'ticket_diagnostic_']) cargo(['test', ...features, '-p', 'xodus', filter]);
   cargo(['test', ...features, '-p', 'xodus-service', 'store_']);
 } finally {
   if (oldTmp === undefined) delete env.TMPDIR; else env.TMPDIR = oldTmp;
@@ -88,8 +88,11 @@ if (checkOnly) {
 }
 const bundle = path.join(work, 'bundle');
 await fs.mkdir(bundle);
+// xodus-service ships as a byte-identical copy of xodus-cli (role from the file
+// name): one code hash, one Keychain grant per build. Cargo's separate
+// xodus-service binary is built and tested but not shipped.
 for (const name of ['xodus-cli', 'xodus-service']) {
-  await fs.copyFile(path.join(target, 'release', name), path.join(bundle, name));
+  await fs.copyFile(path.join(target, 'release', 'xodus-cli'), path.join(bundle, name));
   await fs.chmod(path.join(bundle, name), 0o755);
 }
 signMacBackend(bundle, signingIdentity);
@@ -106,7 +109,7 @@ for (const patch of lock.patches) await fs.copyFile(path.join(root, 'assets', pa
 await fs.copyFile(fileURLToPath(import.meta.url), path.join(recipe, 'scripts/build-mac-backend.mjs'));
 await fs.copyFile(new URL('./mac-backend-signing.mjs', import.meta.url), path.join(recipe, 'scripts/mac-backend-signing.mjs'));
 await fs.copyFile(new URL('./mac-test-volume.mjs', import.meta.url), path.join(recipe, 'scripts/mac-test-volume.mjs'));
-await fs.writeFile(path.join(recipe, 'BUILD.txt'), `GPL-3.0 backend; dependency licenses retained in source/vendor.\nRust ${lock.rust}; macOS SDK and protoc required for rebuilding only.\nFrom source/: MACOSX_DEPLOYMENT_TARGET=13.0 cargo +${lock.rust} build --locked --offline --release --no-default-features -p xodus-cli -p xodus-service\nAuth UI: Electron. Never run xodus-service to inspect it; it accesses account services.\n`);
+await fs.writeFile(path.join(recipe, 'BUILD.txt'), `GPL-3.0 backend; dependency licenses retained in source/vendor.\nRust ${lock.rust}; macOS SDK and protoc required for rebuilding only.\nFrom source/: MACOSX_DEPLOYMENT_TARGET=13.0 cargo +${lock.rust} build --locked --offline --release --no-default-features -p xodus-cli -p xodus-service\nAuth UI: Electron. xodus-service is a byte-identical copy of xodus-cli; the role comes from the file name. Never run xodus-service to inspect it; it accesses account services.\n`);
 // Supply an explicit file list instead of BSD/GNU tar exclusion semantics. Preserve
 // nested dependency directories named target while excluding checkout metadata.
 const entries = (await fs.readdir(source)).filter(name => !['.git', 'target'].includes(name));

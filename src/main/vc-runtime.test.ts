@@ -54,3 +54,15 @@ describe('VC++ runtime detection', () => {
     expect(versionAtLeast(installed!, VC_REDIST_VERSION)).toBe(true);
   });
 });
+
+describe('VC++ install availability', () => {
+  it('needs a full Proton distribution on Linux', async () => {
+    const { vcInstallAvailability } = await import('./vc-runtime.js');
+    expect(vcInstallAvailability('linux', true)).toEqual({ vcInstall: true, vcReason: undefined });
+    expect(vcInstallAvailability('linux', false)).toEqual({ vcInstall: false, vcReason: 'VC++ installation requires a full Xodus Proton distribution.' });
+  });
+  it('is always available on macOS, where the installer runs in the game bottle', async () => {
+    const { vcInstallAvailability } = await import('./vc-runtime.js');
+    expect(vcInstallAvailability('darwin', false)).toEqual({ vcInstall: true, vcReason: undefined });
+  });
+});

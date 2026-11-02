@@ -50,9 +50,29 @@ export function normalizeLaunchTools(value: unknown): GameLaunchTools {
   if (tools.offlineWithoutAntiCheat !== undefined && typeof tools.offlineWithoutAntiCheat !== 'boolean') throw Error('Invalid offline anti-cheat setting.');
   if (tools.metalHud !== undefined && typeof tools.metalHud !== 'boolean') throw Error('Invalid Metal HUD setting.');
   if (tools.dlss !== undefined && typeof tools.dlss !== 'boolean') throw Error('Invalid DLSS setting.');
-  const result = { dualSenseCompatibility: tools.dualSenseCompatibility ?? false, offlineWithoutAntiCheat: tools.offlineWithoutAntiCheat ?? false, metalHud: tools.metalHud ?? false, dlss: tools.dlss ?? false, mangoHud: tools.mangoHud, gamescope: tools.gamescope, gamescopeArgs: tools.gamescopeArgs.trim(), launchOptions: tools.launchOptions.trim() };
+  const executable = normalizeExecutableOverride(tools.executable);
+  const result: GameLaunchTools = { dualSenseCompatibility: tools.dualSenseCompatibility ?? false, offlineWithoutAntiCheat: tools.offlineWithoutAntiCheat ?? false, metalHud: tools.metalHud ?? false, dlss: tools.dlss ?? false, mangoHud: tools.mangoHud, gamescope: tools.gamescope, gamescopeArgs: tools.gamescopeArgs.trim(), launchOptions: tools.launchOptions.trim() };
+  if (executable) result.executable = executable;
   const args = commandWords(result.gamescopeArgs);
   if (args.includes('--') || args.some(arg => arg.includes('%command%'))) throw Error('Gamescope options must not include -- or %command%; Nexus adds the game command.');
   parseLaunchOptions(result.launchOptions);
   return result;
+}
+
+/**
+ * A per-game executable override is a package-relative Windows path to an .exe:
+ * no drive, no absolute path, no `.` / `..` segments. Backslashes are accepted
+ * and normalized to `/`; an empty value means "use the manifest entry".
+ */
+export function normalizeExecutableOverride(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw Error('Invalid executable override.');
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > 260 || /[\0-\x1f]/.test(trimmed)) throw Error('Invalid executable override.');
+  const parts = trimmed.split(/[\\/]+/);
+  if (parts.some(part => !part || part === '.' || part === '..' || part.includes(':'))) throw Error('Invalid executable override.');
+  const normalized = parts.join('/');
+  if (!/\.exe$/i.test(normalized)) throw Error('Invalid executable override.');
+  return normalized;
 }

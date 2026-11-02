@@ -36,22 +36,28 @@ describe('parseMacProfiles', () => {
   });
 
   it('exposes exactly the whitelist from the brief', () => {
-    expect([...MAC_PROFILE_ENV_KEYS].sort()).toEqual(['D3DM_DEVICE_DESCRIPTION', 'D3DM_DEVICE_ID', 'D3DM_ENABLE_METALFX', 'D3DM_VENDOR_ID', 'MTL_HUD_ENABLED', 'ROSETTA_ADVERTISE_AVX', 'WINEESYNC', 'WINEMSYNC']);
+    expect([...MAC_PROFILE_ENV_KEYS].sort()).toEqual(['D3DM_DEVICE_DESCRIPTION', 'D3DM_DEVICE_ID', 'D3DM_ENABLE_METALFX', 'D3DM_VENDOR_ID', 'HB_D3D12_TSSHIM', 'MTL_HUD_ENABLED', 'ROSETTA_ADVERTISE_AVX', 'WINEESYNC', 'WINEMSYNC']);
   });
 });
 
 describe('bundled mac-profiles.json', () => {
-  it('seeds Forza Horizon 6 for both Store IDs with the NVIDIA identity on Highball', async () => {
+  it('seeds Forza Horizon 6 for both Store IDs with the NVIDIA identity on Highball, AVX off and the d3d12 shim on', async () => {
     const log: string[] = [];
     const profiles = await loadMacProfiles(undefined, (line) => log.push(line));
     expect(log).toEqual([]);
     for (const id of ['9N4XW3N02MNJ', '9NR1R1XWLCNB']) {
       expect(profiles[id]).toEqual({
         engine: 'highball',
-        env: { D3DM_VENDOR_ID: '0x10de', D3DM_DEVICE_ID: '0x2786', D3DM_DEVICE_DESCRIPTION: 'NVIDIA GeForce RTX 4070' },
-        note: 'Profilo da highball-db (CC0)',
+        env: { D3DM_VENDOR_ID: '0x10de', D3DM_DEVICE_ID: '0x2786', D3DM_DEVICE_DESCRIPTION: 'NVIDIA GeForce RTX 4070', ROSETTA_ADVERTISE_AVX: '0', HB_D3D12_TSSHIM: '1' },
+        note: 'Profilo da highball-db (CC0); AVX spento (con AVX esce prima di aprire la finestra); shim d3d12 per SV_ShadingRate su M1',
       });
     }
+  });
+
+  it('seeds Forza Horizon 5 with the NVIDIA identity on Highball and the d3d12 shim on', async () => {
+    const profiles = await loadMacProfiles(undefined, () => {});
+    expect(profiles['9NNX1VVR3KNQ']?.engine).toBe('highball');
+    expect(profiles['9NNX1VVR3KNQ']?.env).toEqual({ D3DM_VENDOR_ID: '0x10de', D3DM_DEVICE_ID: '0x2786', D3DM_DEVICE_DESCRIPTION: 'NVIDIA GeForce RTX 4070', HB_D3D12_TSSHIM: '1' });
   });
 
   it('returns an empty set when the file is missing', async () => {

@@ -76,3 +76,9 @@ export async function downloadVerifiedVcRedist(
     await fs.unlink(temporary).catch(() => undefined);
   }
 }
+
+/** VC++ needs a Proton prefix on Linux; on macOS it installs into the game's Wine bottle. */
+export function vcInstallAvailability(platform: NodeJS.Platform, protonAvailable: boolean): { vcInstall: boolean; vcReason: string | undefined } {
+  const vcInstall = platform === 'darwin' || protonAvailable;
+  return { vcInstall, vcReason: vcInstall ? undefined : 'VC++ installation requires a full Xodus Proton distribution.' };
+}

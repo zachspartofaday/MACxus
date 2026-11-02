@@ -195,18 +195,34 @@ export function dllOverrideArgs(name: string): string[] {
 }
 
 /**
- * Sets the native,builtin overrides when the prefix is new, a DLL changed or the
- * marker file is missing/stale; the marker is written only after every override succeeded.
+ * Registry settings every Mac prefix gets, as `reg` arguments:
+ * - the runtime DLL overrides;
+ * - concrt140 from the VC++ redistributable: Wine's builtin hands a concurrent_vector slot still
+ *   being allocated to a second thread (Forza Horizon 6 crash at +0xe3813f, Nexus issue #132),
+ *   and native,builtin still falls back to it when the redistributable is missing;
+ * - the Gaming Services version the Nexus runtime writes on Linux (38.117.27001.0), which
+ *   Forza Horizon 6 checks before it starts a session.
  */
-export async function ensureRuntimeOverrides(prefix: string, force: boolean, regAdd: (name: string) => Promise<RunResult>, label: string): Promise<void> {
+export const MAC_PREFIX_SETTINGS: readonly string[][] = [
+  ...MAC_RUNTIME_DLLS.map(dllOverrideArgs),
+  dllOverrideArgs('concrt140.dll'),
+  ...['CurrentVersion', 'AvailableVersion'].map((value) =>
+    ['reg', 'add', 'HKLM\\SOFTWARE\\Microsoft\\GamingServices', '/v', value, '/t', 'REG_QWORD', '/d', '0x0026007569790000', '/f', '/reg:64']),
+];
+
+/**
+ * Applies MAC_PREFIX_SETTINGS when the prefix is new, a DLL changed or the marker file is
+ * missing/stale (a new setting makes it stale); the marker is written only after every setting succeeded.
+ */
+export async function ensureRuntimeOverrides(prefix: string, force: boolean, reg: (args: string[]) => Promise<RunResult>, label: string): Promise<void> {
   const markerPath = path.join(prefix, '.macxus-overrides');
-  const markerContent = [...MAC_RUNTIME_DLLS].sort().join('\n') + '\n';
+  const markerContent = MAC_PREFIX_SETTINGS.map((args) => args.join(' ')).join('\n') + '\n';
   let confirmed = false;
   try { confirmed = (await fs.readFile(markerPath, 'utf8')) === markerContent; } catch { /* not confirmed yet */ }
   if (!force && confirmed) return;
-  for (const name of MAC_RUNTIME_DLLS) {
-    const result = await regAdd(name);
-    if (result.code !== 0) throw new Error(`Could not set the ${name} override in the ${label} (code ${result.code})`);
+  for (const args of MAC_PREFIX_SETTINGS) {
+    const result = await reg(args);
+    if (result.code !== 0) throw new Error(`Could not set ${args[4]} ${args[6]} in the ${label} (code ${result.code})`);
   }
   await fs.writeFile(markerPath, markerContent);
 }
@@ -241,8 +257,8 @@ export async function prepareCrossOverRunner(
   }
 
   const changed = await installRuntimeDlls(bottlePath, runtimeDlls, log);
-  await ensureRuntimeOverrides(bottlePath, !existed || changed.length > 0, (name) =>
-    run(cx.wine, ['--bottle', BOTTLE, ...dllOverrideArgs(name)], { env }), 'CrossOver bottle');
+  await ensureRuntimeOverrides(bottlePath, !existed || changed.length > 0, (args) =>
+    run(cx.wine, ['--bottle', BOTTLE, ...args], { env }), 'CrossOver bottle');
 
   const runner = path.join(bottlesRoot, 'xodus-crossover-wine');
   await writeRunnerScript(runner, crossOverWrapperScript(cx, bottlesRoot, BOTTLE, graphics));

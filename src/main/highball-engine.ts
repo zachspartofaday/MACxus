@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
-import { dllOverrideArgs, ensureRuntimeOverrides, installRuntimeDlls, shellQuote, writeRunnerScript, type RuntimeDllSource } from './crossover.js';
+import { fileURLToPath } from 'node:url';
+import { ensureRuntimeOverrides, installRuntimeDlls, shellQuote, writeRunnerScript, type RuntimeDllSource } from './crossover.js';
 import { run } from './process.js';
 import type { ProtonRunner } from './proton.js';
 
@@ -239,7 +240,7 @@ function safeEnvironment(extraEnv: Record<string, string>): [string, string][] {
  * (WINEDLLPATH_PREPEND, CX_D3DMETALPATH, DYLD fallback paths). msync defaults on;
  * WINEMSYNC/WINEESYNC and profile values only apply when not already set.
  */
-export function highballWrapperScript(engineRoot: string, appleGptkRoot: string, crossOverLib64: string, prefix: string, extraEnv: Record<string, string>): string {
+export function highballWrapperScript(engineRoot: string, appleGptkRoot: string, crossOverLib64: string, prefix: string, extraEnv: Record<string, string>, d3d12Shim?: D3D12Shim): string {
   const wine = shellQuote(path.join(engineRoot, 'engine', 'bin', 'wine'));
   const wineserver = shellQuote(path.join(engineRoot, 'engine', 'bin', 'wineserver'));
   const externalDir = path.join(appleGptkRoot, 'external');
@@ -267,8 +268,33 @@ export function highballWrapperScript(engineRoot: string, appleGptkRoot: string,
     ...Object.entries(defaults).map(([key, value]) => `export ${key}="\${${key}:-${value}}"`),
     // Like CrossOver's wine script: Rosetta advertises AVX for any value, so 0 must unset it.
     'if [ "$ROSETTA_ADVERTISE_AVX" = 0 ]; then unset ROSETTA_ADVERTISE_AVX; fi',
+    // The d3d12 shim goes in front of D3DMetal only for games that ask for it (a profile or
+    // launch options with HB_D3D12_TSSHIM=1): it has been measured on Forza Horizon 6 only.
+    ...(d3d12Shim ? [
+      'if [ "${HB_D3D12_TSSHIM:-0}" != 0 ]; then',
+      `  export WINEDLLPATH_PREPEND=${shellQuote(`${path.join(d3d12Shim.dir, 'wine')}:${path.join(appleGptkRoot, 'wine')}`)}`,
+      `  export HB_D3D12_REAL=${shellQuote(`Z:${d3d12Shim.realDll.replaceAll('/', '\\')}`)}`,
+      '  echo "Shim d3d12 davanti a D3DMetal (HB_D3D12_TSSHIM=1)." >&2',
+      'fi',
+    ] : []),
     'if [ "${1:-}" = "--nexus-stop-prefix" ]; then',
     `  exec ${wineserver} -k`,
+    'fi',
+    // Like Nexus' Linux wine-launcher: the title's PlayFabGameSave.dll becomes nexus_pgs_native.dll
+    // behind the runtime's proxy, which adds the stock UI in-process PlayFab saves expect. Only a
+    // symlink in the RAM-disk launch view is swapped, and it is put back before the backend copies
+    // the game's new files into its folder. NEXUS_PLAYFAB_ADAPTER=0 turns it off.
+    'pgs_restore() { rm -f "$pgs_dll" "$pgs_dir/nexus_pgs_native.dll"; ln -s "$pgs_target" "$pgs_dll"; }',
+    'case "${1:-}" in Z:\\\\*) pgs_dir=$(printf \'%s\' "${1#Z:}" | tr \'\\\\\' /); pgs_dir=${pgs_dir%/*} ;; *) pgs_dir= ;; esac',
+    'pgs_dll="$pgs_dir/PlayFabGameSave.dll"',
+    'if [ -n "$pgs_dir" ] && [ "${NEXUS_PLAYFAB_ADAPTER:-1}" != 0 ] && [ -f "${NEXUS_PGS_PROXY:-}" ] && [ -L "$pgs_dll" ] && [ ! -e "$pgs_dir/nexus_pgs_native.dll" ]; then',
+    '  pgs_target=$(readlink "$pgs_dll")',
+    '  if cp "$pgs_dll" "$pgs_dir/nexus_pgs_native.dll" && rm "$pgs_dll" && cp "$NEXUS_PGS_PROXY" "$pgs_dll"; then',
+    '    trap pgs_restore EXIT; trap \'exit 129\' HUP; trap \'exit 130\' INT; trap \'exit 143\' TERM',
+    '    export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:+$WINEDLLOVERRIDES;}playfabgamesave=n;nexus_pgs_native=n"',
+    '  else',
+    '    pgs_restore',
+    '  fi',
     'fi',
     'launch_status=0',
     `${wine} "$@" || launch_status=$?`,
@@ -282,6 +308,80 @@ export function highballWrapperScript(engineRoot: string, appleGptkRoot: string,
 
 export function highballOverrideDirectory(dataRoot: string): string {
   return path.join(dataRoot, 'highball-overrides');
+}
+
+export function highballShimDirectory(dataRoot: string): string {
+  return path.join(dataRoot, 'highball-d3d12-shim');
+}
+
+export interface D3D12Shim {
+  /** Overlay root holding wine/x86_64-windows/d3d12.dll (the shim) and apd12.dll. */
+  dir: string;
+  /** D3DMetal's d3d12.dll laid out beside the shim under the name it loads. */
+  realDll: string;
+}
+
+/** Rewrites a PE's export directory name (same length only, so nothing else moves). */
+export function patchPeExportName(pe: Buffer, name: string): Buffer {
+  const out = Buffer.from(pe);
+  const header = out.readUInt32LE(0x3c);
+  if (out.toString('latin1', header, header + 4) !== 'PE\0\0') throw new Error('Not a PE file');
+  const sections = out.readUInt16LE(header + 6);
+  const optional = header + 24;
+  if (out.readUInt16LE(optional) !== 0x20b) throw new Error('Not a PE32+ file');
+  const table = optional + out.readUInt16LE(header + 20);
+  const fileOffset = (rva: number) => {
+    for (let i = 0; i < sections; i++) {
+      const entry = table + 40 * i;
+      const [size, address, rawSize, raw] = [out.readUInt32LE(entry + 8), out.readUInt32LE(entry + 12), out.readUInt32LE(entry + 16), out.readUInt32LE(entry + 20)];
+      if (rva >= address && rva < address + Math.max(size, rawSize)) return rva - address + raw;
+    }
+    throw new Error(`RVA 0x${rva.toString(16)} is outside every section`);
+  };
+  const nameOffset = fileOffset(out.readUInt32LE(fileOffset(out.readUInt32LE(optional + 112)) + 12));
+  const end = out.indexOf(0, nameOffset);
+  if (end - nameOffset !== name.length) throw new Error(`Export name ${out.toString('latin1', nameOffset, end)} cannot become ${name}`);
+  out.write(name, nameOffset, 'latin1');
+  return out;
+}
+
+const SHIM_REAL = 'apd12';
+const BUNDLED_D3D12_SHIM = fileURLToPath(new URL('../../assets/d3d12-shim/d3d12.dll', import.meta.url));
+
+/**
+ * Copies MACxus' build of the shim (assets/d3d12-shim, GPL-3.0, sources beside it) into shimRoot
+ * when it is missing or different. A shim placed there by hand is replaced by the bundled one.
+ */
+export async function installBundledD3D12Shim(shimRoot: string, bundled = BUNDLED_D3D12_SHIM): Promise<void> {
+  const wanted = await readOptional(bundled);
+  if (!wanted) return;
+  const target = path.join(shimRoot, 'wine', 'x86_64-windows', 'd3d12.dll');
+  if ((await readOptional(target))?.equals(wanted)) return;
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await replaceFile(target, wanted);
+}
+
+/**
+ * Lays out the d3d12 shim the way Highball does: D3DMetal's d3d12.dll beside it as apd12.dll,
+ * export name patched (CrossOver's Wine tells builtins apart by that name, so under its own the
+ * copy would come back as the shim), and its unix half linked as apd12.so. Undefined when no shim
+ * is installed in shimRoot.
+ */
+export async function prepareD3D12Shim(shimRoot: string, appleGptkRoot: string): Promise<D3D12Shim | undefined> {
+  const pe = path.join(shimRoot, 'wine', 'x86_64-windows');
+  if (!existsSync(path.join(pe, 'd3d12.dll'))) return undefined;
+  const realDll = path.join(pe, `${SHIM_REAL}.dll`);
+  const wanted = patchPeExportName(await fs.readFile(path.join(appleGptkRoot, 'wine', 'x86_64-windows', 'd3d12.dll')), `${SHIM_REAL}.dll`);
+  if (!(await readOptional(realDll))?.equals(wanted)) await replaceFile(realDll, wanted);
+  const unix = path.join(shimRoot, 'wine', 'x86_64-unix');
+  const link = path.join(unix, `${SHIM_REAL}.so`);
+  const target = path.join(appleGptkRoot, 'wine', 'x86_64-unix', 'd3d12.so');
+  await fs.mkdir(unix, { recursive: true });
+  if (await fs.readlink(link).catch(() => undefined) !== target) {
+    await fs.rm(link, { force: true });
+    await fs.symlink(target, link);
+  }
+  return { dir: shimRoot, realDll };
 }
 
 async function readOptional(file: string): Promise<Buffer | undefined> {
@@ -353,6 +453,7 @@ export async function prepareHighballRunner(
   extraEnv: Record<string, string> = {},
   log: (line: string) => void = () => undefined,
   engineOverrideDir?: string,
+  d3d12ShimDir?: string,
 ): Promise<ProtonRunner> {
   const wine = path.join(engineRoot, 'engine', 'bin', 'wine');
   const wineserver = path.join(engineRoot, 'engine', 'bin', 'wineserver');
@@ -376,10 +477,17 @@ export async function prepareHighballRunner(
   }
 
   const changed = await installRuntimeDlls(prefix, runtimeDlls, log);
-  await ensureRuntimeOverrides(prefix, !existed || changed.length > 0, (name) => run(wine, dllOverrideArgs(name), { env }), 'Highball prefix');
+  await ensureRuntimeOverrides(prefix, !existed || changed.length > 0, (args) => run(wine, args, { env }), 'Highball prefix');
   if (engineOverrideDir) await installHighballEngineOverrides(engineRoot, prefix, engineOverrideDir, log);
 
   const runner = path.join(bottlesRoot, RUNNER);
-  await writeRunnerScript(runner, highballWrapperScript(engineRoot, appleGptkRoot, crossOverLib64, prefix, extraEnv));
+  // The shim serves D3D12 calls D3DMetal does not implement (timestamp queries, shader-model
+  // queries, depth resolves), corrects APPEND_ALIGNED input-layout offsets and makes pixel shaders
+  // that read SV_ShadingRate drawable on GPUs without VRS. The bundled build is laid out for every
+  // Highball launch, and the wrapper uses it when HB_D3D12_TSSHIM=1. 64-bit atomics are NOT hidden:
+  // hiding them made Halo refuse to start (Nanite requires the capability).
+  if (d3d12ShimDir) await installBundledD3D12Shim(d3d12ShimDir);
+  const shim = d3d12ShimDir ? await prepareD3D12Shim(d3d12ShimDir, appleGptkRoot) : undefined;
+  await writeRunnerScript(runner, highballWrapperScript(engineRoot, appleGptkRoot, crossOverLib64, prefix, extraEnv, shim));
   return { command: runner, compatibilityDataPath: prefix, stopPrefix: { command: runner, args: ['--nexus-stop-prefix'] } };
 }
