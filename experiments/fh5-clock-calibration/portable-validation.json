@@ -206,7 +206,14 @@
     "performanceAcceptance": false,
     "actualGameHelperModulesObserved": true,
     "liveCalibrationCallsObservedReadOnly": 94965,
-    "scalarReturnTrace": "Early records lost because output sink was missing; recreated during live session. Successful HRESULT trace not yet captured."
+    "scalarReturnTrace": {
+      "operation": "GetClockCalibration",
+      "sampledCallCount": 131072,
+      "HRESULT": "S_OK / 00000000",
+      "calibrationImplemented": true,
+      "guestQPCFrequency": 10000000,
+      "GPUFrequencySample": 24000000
+    }
   },
   "limits": [
     "Normal Play trial of integrated six-module application pending",
@@ -216,5 +223,12 @@
     "No new acceptance of frame generation correctness or performance",
     "Black-road investigation excluded"
   ],
-  "freshIndependentIntegrationReview": "pending"
+  "freshIndependentIntegrationReview": {
+    "head": "4e005f4328417d76b893592f55a9303147e80b95",
+    "productionFindings": [],
+    "runnerFinding": "P2 old prototype transformations reapplied to integrated source",
+    "runnerResolution": "Runner now reconstructs current production source directly; no duplicate native export or hook transformation",
+    "runnerValidation": "7 unit/reconstruction tests reach compilation; full documented command against linked-DLL template passes and preserves sentinel",
+    "independentRebuild": "All six production payloads, receipt and archive reproduced exactly; runtime/launcher tests passed"
+  }
 }

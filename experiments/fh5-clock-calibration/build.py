@@ -35,6 +35,15 @@ def install_clock(prefix, source):
     finally:
         if os.path.lexists(temporary):os.unlink(temporary)
 
+def reconstruct_source(destination, execute):
+    # The current source already contains the native export and opt-in hook.
+    # Reconstruct only the base D3D12 shim patches; never apply the old prototype
+    # text transformations or append a second calibration export.
+    shutil.copytree(REPO/'assets/fh5-preview/source',destination)
+    for patch in ['fh5-timestamp.patch','metal4-frequency.patch','clock-reporting.patch']:
+        execute(['git','apply',destination/'metal4'/patch],cwd=destination/'shim')
+    return destination
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('output',type=Path);p.add_argument('--sdk',required=True,type=Path)
@@ -56,26 +65,14 @@ def main():
         if result.returncode:raise RuntimeError('Command failed: '+str(args[0])+'\n'+result.stdout[-4000:]+result.stderr[-4000:])
         return result
     for arch in ['x86_64-windows','x86_64-unix']:(r/'dlls'/arch).mkdir(parents=True)
-    own=r/'source';shutil.copytree(REPO/'assets/fh5-preview/source',own)
-    for patch in ['fh5-timestamp.patch','metal4-frequency.patch','clock-reporting.patch']:
-        run(['git','apply',own/'metal4'/patch],cwd=own/'shim')
-    for file in HERE.iterdir():
-        if file.is_file():shutil.copyfile(file,own/file.name)
+    own=reconstruct_source(r/'source',run)
     bridge=own/'metal4/metal4-query-bridge.m'
-    bridge.write_text(bridge.read_text()+'\n#include "clock-native.h"\nint32_t macxus_metal4_calibrate_v1(struct mx_clock_sample *p) { return mx_sample_device(gpu,p); }\n')
-    header=own/'shim/gpu_clock_reporting.h';text=header.read_text()
-    old='    (void)queue;\n    clock_reporting_note(1, E_NOTIMPL, 0, gpu != NULL, cpu != NULL, OBS_CALLER);\n    return E_NOTIMPL;'
-    assert text.count(old)==1
-    text=text.replace('static HRESULT STDMETHODCALLTYPE hook_GetClockCalibration', '#include "clock-hook.h"\n\nstatic HRESULT STDMETHODCALLTYPE hook_GetClockCalibration')
-    text=text.replace(old,'    HRESULT result = mx_get_calibration(queue, gpu, cpu);\n    clock_reporting_note(1, result, 0, gpu != NULL, cpu != NULL, OBS_CALLER);\n    return result;')
-    text=text.replace('calibration_implemented=0','calibration_implemented=%u').replace('gpu_output, cpu_output);','gpu_output, cpu_output, operation == 1 && SUCCEEDED(result));')
-    header.write_text(text)
     clang=['clang','-arch','x86_64','-mmacosx-version-min=26.0','-O2','-Wall','-Wextra','-Werror','-I'+str(own)]
-    run(clang+['-dynamiclib',own/'clock-unix.c','-o',r/'dlls/x86_64-unix/macxus-clock.so'])
+    run(clang+['-dynamiclib',own/'clock/clock-unix.c','-install_name','@rpath/macxus-clock.so','-o',r/'dlls/x86_64-unix/macxus-clock.so'])
     run(clang+['-fobjc-arc','-dynamiclib',bridge,'-framework','Foundation','-framework','Metal','-install_name','@rpath/macxus-metal4-timestamps.dylib','-o',r/'macxus-metal4-timestamps.dylib'])
-    run([build/'tools/winegcc/winegcc','-b','x86_64-w64-mingw32','--wine-objdir',build,'-shared','-Wl,--wine-builtin','-D__WINESRC__','-O2','-Wall','-I'+str(build/'include'),'-I'+str(src/'include'),own/'clock-pe.c',own/'macxus-clock.spec','-o',r/'dlls/x86_64-windows/macxus-clock.dll','-lwinecrt0','-lkernel32','-lntdll','-Wl,--no-insert-timestamp','-Wl,--build-id=none'])
+    run([build/'tools/winegcc/winegcc','-b','x86_64-w64-mingw32','--wine-objdir',build,'-shared','-Wl,--wine-builtin','-D__WINESRC__','-O2','-Wall','-I'+str(build/'include'),'-I'+str(src/'include'),own/'clock/clock-pe.c',own/'clock/macxus-clock.spec','-o',r/'dlls/x86_64-windows/macxus-clock.dll','-lwinecrt0','-lkernel32','-lntdll','-Wl,--no-insert-timestamp','-Wl,--build-id=none'])
     gcc=['x86_64-w64-mingw32-gcc','-O2','-Wall','-Wextra','-Wl,--no-insert-timestamp']
-    run(gcc+[own/'clock-probe.c','-o',r/'clock-probe.exe'])
+    run(gcc+[own/'clock/clock-probe.c','-o',r/'clock-probe.exe'])
     run(gcc+['-I'+str(own),own/'tests/gpu-clock-reporting.c','-o',r/'disabled-hook-probe.exe'])
     run(gcc+['-I'+str(own),'-shared',*[own/'shim'/name for name in ['d3d12.c','dxil_shadingrate.c','inspect.c','d3d12.def']],'-Wl,--image-base,0x180000000','-o',r/'d3d12.dll','-lws2_32','-lbcrypt'])
     # Drive the actual proxy's queue vtable around real GPU submissions.
@@ -85,8 +82,8 @@ def main():
     text=text.replace('        previous=values[1];','        if(values[0]<g0 || values[1]>g1 || c1<c0){puts("CALIBRATION_QUERY_FAIL");return 4;}\n        printf("CALIBRATED_QUERY iteration=%u bracketed=1\\n",iteration);\n        previous=values[1];')
     query.write_text(text)
     run(gcc+[query,'-o',r/'query-probe.exe'])
-    run(clang+['-fobjc-arc',own/'native-probe.m','-framework','Foundation','-framework','Metal','-o',r/'native-probe'])
-    run(['clang','-O1','-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-Wall','-Wextra','-Werror',own/'math-probe.c','-o',r/'math-probe'])
+    run(clang+['-fobjc-arc',own/'clock/native-probe.m','-framework','Foundation','-framework','Metal','-o',r/'native-probe'])
+    run(['clang','-O1','-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-Wall','-Wextra','-Werror',own/'clock/math-probe.c','-o',r/'math-probe'])
     run([r/'math-probe'],'math')
     run([r/'native-probe'],'native')
     prefix=r/'prefix'
