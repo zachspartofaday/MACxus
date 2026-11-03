@@ -184,13 +184,17 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
     D3DM_MTL4: '1', MACXUS_PROCESS_OBSERVER: '1', MACXUS_TIMESTAMP_ONLY: '1', MACXUS_APPEND_ONLY: '1', MACXUS_FH5_UNUSED_BLEND: '1',
     MACXUS_GPU_CLOCK_CALIBRATION: '1',
     MACXUS_FH5_DESCRIPTOR_DATA: '1', MACXUS_DUAL_UDP_TTL: '1', MACXUS_COMMIT_ACCOUNTING: '1', HB_TSSHIM_DEBUG: '0',
-    D3DM_VENDOR_ID: '0x10de', D3DM_DEVICE_ID: '0x2786', D3DM_DEVICE_DESCRIPTION: 'NVIDIA GeForce RTX 4070',
+    D3DM_DEVICE_DESCRIPTION: `${host.chip} (D3DMetal)`,
     HB_D3D12_REAL: 'Z:' + path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll').replaceAll('/', '\\'),
     XODUS_CONTENT_PACKAGE_ROOT: 'Z:' + path.resolve(request.gameRoot).replaceAll('/', '\\'),
   };
   const wrapper = path.join(bottles, 'fh5-game-wine');
   const temporary = wrapper + '.tmp-' + process.pid;
   await fs.writeFile(temporary, '#!/bin/sh\n' + Object.entries(environment).map(([name, value]) => `export ${name}=${shellQuote(value)}`).join('\n') +
+    // Preview's MetalFX/DLSS mode supplies its own compatibility IDs. Preserve
+    // the accepted fallback when it is off: default AMD IDs previously faulted
+    // in FH5's AGS startup path. Never let inherited IDs contaminate this test.
+    '\nif [ "${D3DM_ENABLE_METALFX:-0}" = "1" ]; then\n  unset D3DM_VENDOR_ID D3DM_DEVICE_ID\nelse\n  export D3DM_VENDOR_ID=0x10de D3DM_DEVICE_ID=0x2786\nfi\n' +
     '\nexport WINEDLLOVERRIDES="d3d12=n,b;macxus-clock=b;${WINEDLLOVERRIDES:-}"\n' + `launch_status=0\n${shellQuote(native)} "$@" || launch_status=$?\n${shellQuote(engine.wineserver)} -w\nexit "$launch_status"\n`, { flag: 'wx', mode: 0o700 });
   await fs.rename(temporary, wrapper);
   request.log('FH5 Preview pack enabled in its dedicated bottle; Metal 4 and guarded runtime fixes active.');
