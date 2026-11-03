@@ -57,7 +57,9 @@ It reads the SDK’s generated rules without invoking make regeneration, compile
 all 23 runtime C objects afresh, and rebuilds XML and Windows JSON support from
 pinned Wine Git objects. No cached runtime or XML implementation object is linked.
 The SDK is a maintainer input, not an end-user requirement or shipped binary.
-In the source release, run these commands from `corresponding-source/recipe`.
+In the source release, run the Python build/verification commands from
+`corresponding-source/recipe`. The Node staging command below requires the full
+MACxus application checkout; it is not part of standalone source reconstruction.
 
 From the repository root, with new build/evidence directories:
 
