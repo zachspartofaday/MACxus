@@ -10,7 +10,7 @@
   "sourceLockSHA256": "7893b9658f5677842e3c18d18cf0cdf8f31c25bbd0205670d7a605a231d08015",
   "sourceArchive": {
     "name": "fh5-preview-v1-source.tar.gz",
-    "sha256": "c537be05ddea705b00956660cff6eeb30dcaa2958ab07bfc6e03b1ccb4a640e1"
+    "sha256": "9f4aa24fb5983ecc8f1a1105cd1ca4df4fb47d319a32262ec364cf7da6ab8e57"
   },
   "sameReceiptsAcrossTwoBuildRootsIncludingSpaces": true,
   "all23RuntimeCObjectsRecompiledPerBuild": true,
@@ -111,7 +111,7 @@
   "gameLaunched": false,
   "accountUsed": false,
   "livePortablePackAcceptance": "pending",
-  "freshIndependentSolReview": "Full e092454 review found one P2 source-release workflow issue; bootstrap, archive descriptor and consumer regressions now implemented, fresh recheck pending",
+  "freshIndependentSolReview": "F1 recheck found remaining builder manifest read; fixed same descriptor fallback and tested both stubbed main suffix and REAL full compile from extracted archive; fresh recheck pending",
   "knownLimits": [
     "Black-road investigation intentionally excluded",
     "Clock calibration still E_NOTIMPL; latency unresolved",
@@ -129,7 +129,7 @@
   "followUpFocusedTests": {
     "launcherPassed": 91,
     "distributionPassed": 3,
-    "pythonBuildContractsPassed": 4,
+    "pythonBuildContractsPassed": 5,
     "typecheck": "passed"
   },
   "latestActualPreparedWrapperRepeat": "Corrected e092454 proxy passed32 async GPU iterations. Final metadata-only runtime artifact repeat stopped during vendor first-bottle setup before pack DLL installation; no acceptance claimed for that repeat.",
@@ -145,6 +145,15 @@
     "twoDifferentSDKLocations": true,
     "sdkPreparedFromPinnedGitObjects": true,
     "PECodeViewBuildIDDisabledForPathIndependence": true,
-    "standaloneVerificationFromFinalArchive": "passed input checks; same verifier bytes passed all runtime/native probes from prior extraction"
+    "standaloneVerificationFromFinalArchive": "passed input checks; same verifier bytes passed all runtime/native probes from prior extraction",
+    "actualStandaloneArchivedBuild": {
+      "realStandaloneArchivedBuildCompleted": true,
+      "noApplicationManifest": true,
+      "compilerStubsUsed": false,
+      "freshSDKUsed": true,
+      "allPayloadsReceiptsAndSourceArchivesEqual": true,
+      "gameLaunched": false,
+      "accountUsed": false
+    }
   }
 }

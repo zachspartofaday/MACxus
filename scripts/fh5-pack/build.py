@@ -226,7 +226,10 @@ def main():
     shutil.copytree(PACK,recipe/'assets/fh5-preview',ignore=shutil.ignore_patterns('payload','source-release','manifest.json'))
     # Verification needs the candidate/engine pins, but including the final
     # manifest would recursively embed this archive's own hash.
-    manifest=json.loads((PACK/'manifest.json').read_text())
+    metadata=PACK/'manifest.json'
+    if not metadata.exists():metadata=PACK/'verification.json'
+    manifest=json.loads(metadata.read_text())
+    if metadata.name=='verification.json' and (manifest.get('sourceReleaseDescriptor')!=1 or 'sourceArchive' in manifest):raise ValueError('Invalid source-release build descriptor')
     descriptor=verification_descriptor(manifest,receipt)
     (recipe/'assets/fh5-preview/verification.json').write_text(json.dumps(descriptor,indent=2,sort_keys=True)+'\n')
     archive=output/'fh5-preview-v1-source.tar.gz'
