@@ -12,7 +12,9 @@ const request = Buffer.from(`<Request><ParentProductId>${parent}</ParentProductI
 it('settles cancelled inventory after an exited helper leaves inherited pipes open', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'addon inherited pipes '));
   const binary = path.join(root, 'backend'), marker = path.join(root, 'ready');
-  const childCode = `process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(${JSON.stringify(marker)},String(process.pid));setInterval(()=>{},1000);`;
+  // Publish readiness only after its PID bytes are complete; file creation
+  // notifications can arrive before writeFileSync has written the content.
+  const childCode = `process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(${JSON.stringify(marker + '.tmp')},String(process.pid));require('node:fs').renameSync(${JSON.stringify(marker + '.tmp')},${JSON.stringify(marker)});setInterval(()=>{},1000);`;
   await fs.writeFile(binary, `#!/usr/bin/env node\nrequire('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(childCode)}],{stdio:['ignore',1,2]});setInterval(()=>{},1000);\n`, { mode: 0o700 });
   const watcher = watch(root);
   const ready = new Promise<void>(resolve => watcher.on('change', (_, file) => { if (file === 'ready') resolve(); }));
@@ -26,13 +28,14 @@ it('settles cancelled inventory after an exited helper leaves inherited pipes op
     const header = Buffer.alloc(8); header.writeUInt32LE(0x58445358); header.writeUInt16LE(0x7f01, 4); header.writeUInt16LE(request.length, 6);
     client.write(Buffer.concat([Buffer.from(bridge.key), header, request]));
     await ready; pid = Number(await fs.readFile(marker, 'utf8'));
+    expect(Number.isSafeInteger(pid) && pid > 1).toBe(true);
     await bridge.stop();
     expect((await inventory).toString()).toContain('2147500036');
     // Group escalation must reach the pipe holder even after its parent exits.
     await vi.waitFor(() => expect(() => process.kill(pid!, 0)).toThrow(), { timeout: 2000 });
   } finally {
     watcher.close(); client.destroy(); await bridge.stop();
-    if (pid) { try { process.kill(pid, 'SIGKILL'); } catch { /* reaped */ } }
+    if (pid !== undefined && Number.isSafeInteger(pid) && pid > 1) { try { process.kill(pid, 'SIGKILL'); } catch { /* reaped */ } }
     await fs.rm(root, { recursive: true, force: true });
   }
 });
@@ -130,19 +133,20 @@ it('waits for termination of a relocated backend that ignores SIGTERM before rel
   let pid: number | undefined;
   const watcher = watch(root);
   const ready = new Promise<void>(resolve => watcher.on('change', (_, file) => { if (file === 'ready') resolve(); }));
-  await fs.writeFile(binary, `#!/usr/bin/env node\nconst fs=require('node:fs');process.on('SIGTERM',()=>{});fs.writeFileSync(${JSON.stringify(marker)},String(process.pid));setInterval(()=>{},1000);\n`, { mode: 0o700 });
+  await fs.writeFile(binary, `#!/usr/bin/env node\nconst fs=require('node:fs');process.on('SIGTERM',()=>{});fs.writeFileSync(${JSON.stringify(marker + '.tmp')},String(process.pid));fs.renameSync(${JSON.stringify(marker + '.tmp')},${JSON.stringify(marker)});setInterval(()=>{},1000);\n`, { mode: 0o700 });
   const cancelled = new AbortController();
   try {
     const handler = createStoreAddonDiscovery(binary, parent);
     const running = handler(request, cancelled.signal);
     await ready; pid = Number(await fs.readFile(marker, 'utf8'));
+    expect(Number.isSafeInteger(pid) && pid > 1).toBe(true);
     cancelled.abort();
     expect((await handler(request, new AbortController().signal)).toString()).toContain('2147942570');
     expect((await running).toString()).toContain('2147500036');
     expect(() => process.kill(pid!, 0)).toThrow();
   } finally {
     cancelled.abort(); watcher.close();
-    if (pid) { try { process.kill(pid, 'SIGKILL'); } catch { /* already reaped */ } }
+    if (pid !== undefined && Number.isSafeInteger(pid) && pid > 1) { try { process.kill(pid, 'SIGKILL'); } catch { /* already reaped */ } }
     await fs.rm(root, { recursive: true, force: true });
   }
 });
