@@ -3,14 +3,14 @@
   "scope": "FH5 Store portable pack on M5 Max / Preview Rosetta 20261015 / Metal 4",
   "payloadSHA256": {
     "macxus-metal4-timestamps.dylib": "cc7988fd67df029acd288f23184d34fc1d05497a52b0d9a61a88477eb32ef677",
-    "windows.web.dll": "ea99d7b4fccbfb018b63696a369dfd471403d0e04d846c6663e3908c95a5e6da",
+    "windows.web.dll": "d96352f9c95bde5c1b1c790b5eda80ea06b0772b9d44508ed8b6fb1aaa6e68d6",
     "d3d12.dll": "5c0e9992cda8da8ab11b973ff98df03b794c4b2fe2a10b1cf9c7d26a46079604",
-    "xgameruntime.dll": "72ea1c762e0cb6d81bfb5f656364c686bd01f07d3266095ce8a9352864557107"
+    "xgameruntime.dll": "7f3b8bc86edbaa3d85c6579160c32c14afa8d3961a164787e1434474d7411636"
   },
   "sourceLockSHA256": "7893b9658f5677842e3c18d18cf0cdf8f31c25bbd0205670d7a605a231d08015",
   "sourceArchive": {
     "name": "fh5-preview-v1-source.tar.gz",
-    "sha256": "8acca40086c5d0852bb7a2e7ee87941dce1a3b768430bf63c919e5c477e18fc0"
+    "sha256": "ff3de9b179fd7000bd317fb314bd35dba04c6b3be903c421fde1854e54961be7"
   },
   "sameReceiptsAcrossTwoBuildRootsIncludingSpaces": true,
   "all23RuntimeCObjectsRecompiledPerBuild": true,
@@ -98,7 +98,7 @@
     "realGPUReadbacks": true
   },
   "launcherTests": {
-    "passed": 1437,
+    "passed": 1438,
     "skipped": 10,
     "failed": 0
   },
@@ -111,7 +111,7 @@
   "gameLaunched": false,
   "accountUsed": false,
   "livePortablePackAcceptance": "pending",
-  "freshIndependentSolReview": "Prior attempt disconnected after recording possible debug parser finding; corrected candidate awaiting fresh full review",
+  "freshIndependentSolReview": "Full e092454 review found one P2 source-release usability issue, now corrected; fresh focused recheck pending",
   "knownLimits": [
     "Black-road investigation intentionally excluded",
     "Clock calibration still E_NOTIMPL; latency unresolved",
@@ -129,8 +129,21 @@
   "followUpFocusedTests": {
     "launcherPassed": 91,
     "distributionPassed": 3,
-    "pythonBuildContractsPassed": 2,
+    "pythonBuildContractsPassed": 4,
     "typecheck": "passed"
   },
-  "latestActualPreparedWrapperRepeat": "pending after corrected proxy; earlier32-iteration result applies to initial proxy"
+  "latestActualPreparedWrapperRepeat": "e092454 proxy passed32 async GPU iterations after parser correction; final metadata-only runtime artifact repeat in progress",
+  "sourceReleaseConsumer": {
+    "sourceArchiveDescriptorSelfContained": true,
+    "sdkBootstrapAndInstructionsPresent": true,
+    "archiveEntryPointChecksExactPayload": true,
+    "recursiveManifestExcluded": true,
+    "freshSDK25GeneratedInputsVerified": true,
+    "freshAndHistoricalSDKSamePayloadAndArchive": true,
+    "gameLaunched": false,
+    "accountUsed": false,
+    "twoDifferentSDKLocations": true,
+    "sdkPreparedFromPinnedGitObjects": true,
+    "PECodeViewBuildIDDisabledForPathIndependence": true
+  }
 }

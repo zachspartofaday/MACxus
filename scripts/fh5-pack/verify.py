@@ -4,15 +4,28 @@ from pathlib import Path
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('build',type=Path);parser.add_argument('--engine',required=True,type=Path);parser.add_argument('--output',required=True,type=Path)
-    args=parser.parse_args();build=args.build.resolve();engine=args.engine.resolve();root=args.output.resolve();root.mkdir(parents=True,exist_ok=False)
+    parser.add_argument('build',type=Path);parser.add_argument('--engine',type=Path);parser.add_argument('--output',required=True,type=Path)
+    parser.add_argument('--check-inputs-only',action='store_true')
+    args=parser.parse_args()
+    if not args.check_inputs_only and not args.engine: parser.error('--engine is required for runtime probes')
+    build=args.build.resolve();root=args.output.resolve();root.mkdir(parents=True,exist_ok=False)
     receipt=json.loads((build/'build.json').read_text())
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'assets/fh5-preview/manifest.json').read_text())
+    assets=Path(__file__).resolve().parents[2]/'assets/fh5-preview'
+    descriptor=assets/'manifest.json'
+    if not descriptor.exists(): descriptor=assets/'verification.json'
+    manifest=json.loads(descriptor.read_text())
+    if descriptor.name=='verification.json' and (manifest.get('sourceReleaseDescriptor')!=1 or 'sourceArchive' in manifest):raise ValueError('Invalid source-release verification descriptor')
+    if receipt['sourceLockSHA256']!=manifest['sourceLockSHA256']:raise ValueError('Build source lock differs from the verification descriptor')
+    if hashlib.sha256((assets/'source.lock.json').read_bytes()).hexdigest()!=manifest['sourceLockSHA256']:raise ValueError('Verification source lock changed')
     if receipt['files']!=manifest['files']:raise ValueError('Build is not the committed pack candidate')
-    for name,expected in manifest['engineFiles'].items():
-        if hashlib.sha256((engine/name).read_bytes()).hexdigest()!=expected:raise ValueError('Unexpected Preview component: '+name)
     for name,expected in receipt['files'].items():
         if name not in ['d3d12.dll','xgameruntime.dll','windows.web.dll','macxus-metal4-timestamps.dylib'] or hashlib.sha256((build/'payload'/name).read_bytes()).hexdigest()!=expected:raise ValueError('Pack payload changed')
+    if args.check_inputs_only:
+        (root/'inputs.json').write_text(json.dumps({'payloadVerified':True,'sourceLockVerified':True,'engineVerified':False,'gameLaunched':False,'accountUsed':False})+'\n')
+        print('Source-release descriptor and build payload verified; no engine or runtime accessed.');return
+    engine=args.engine.resolve()
+    for name,expected in manifest['engineFiles'].items():
+        if hashlib.sha256((engine/name).read_bytes()).hexdigest()!=expected:raise ValueError('Unexpected Preview component: '+name)
     env={key:value for key,value in os.environ.items() if not key.startswith(('XODUS_','XUSER_','WINE','CX_','DYLD_','MACXUS_','NEXUS_','Steam','STEAM_'))}
     prefix=root/'prefix';prefix.mkdir();env.update(WINEPREFIX=str(prefix),CX_ROOT=str(engine),WINESERVER=str(engine/'bin/wineserver'),WINELOADER=str(engine/'lib/wine/x86_64-unix/wine'),WINEDEBUG='-all,err+all',WINEDLLOVERRIDES='winemenubuilder.exe,winedbg.exe=d;xgameruntime,windows.web=n,b')
     results=[]

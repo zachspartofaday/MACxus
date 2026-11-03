@@ -51,12 +51,13 @@ No all-modes, all-game-builds, Steam-edition or long-session acceptance is claim
 Requirements: Python 3.12+, Git, the recorded MinGW toolchain, Apple command-line
 tools/Metal 4 SDK, and a generated Wine SDK at the exact commit in
 `source.lock.json`. The SDK must contain matching PE headers, Wine compiler
-helpers and import libraries. It can be prepared from the shared runtime recipe
-in `scripts/SHARED_RUNTIME.md`; this builder checks its revision/generated inputs.
+helpers and import libraries. Prepare it using the standalone bootstrap and
+instructions in `scripts/fh5-pack/SDK.md`; this builder checks its revision/generated inputs.
 It reads the SDK’s generated rules without invoking make regeneration, compiles
 all 23 runtime C objects afresh, and rebuilds XML and Windows JSON support from
 pinned Wine Git objects. No cached runtime or XML implementation object is linked.
 The SDK is a maintainer input, not an end-user requirement or shipped binary.
+In the source release, run these commands from `corresponding-source/recipe`.
 
 From the repository root, with new build/evidence directories:
 

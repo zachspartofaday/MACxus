@@ -4,6 +4,15 @@ from pathlib import Path
 spec=importlib.util.spec_from_file_location('fh5_build',Path(__file__).with_name('build.py'))
 build=importlib.util.module_from_spec(spec);spec.loader.exec_module(build)
 class Inputs(unittest.TestCase):
+    def test_relative_and_absolute_sdk_includes_map_to_the_same_fresh_source(self):
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);sdk=root/'sdk';old=root/'wine-src/dlls/xgameruntime';new=root/'fresh/runtime';out=root/'output'
+            relative='-I../wine-src/dlls/xgameruntime'
+            a=build.sdk_include(relative,sdk,old,new,out)
+            b=build.sdk_include('-I'+str(old),sdk,old,new,out)
+            self.assertEqual(a,b)
+            self.assertEqual((out/a[2:]).resolve(),new.resolve())
+            self.assertEqual(build.sdk_include('-Iinclude',sdk,old,new,out),'-I'+str((sdk/'include').resolve()))
     def test_header_path_is_provenance_only_and_abi_bytes_are_kept(self):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);a=root/'a.h';b=root/'b.h'

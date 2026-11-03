@@ -44,6 +44,18 @@ def sdk_digest(file, relative):
         data=prefix+marker+expected+suffix+newline+body
     return hashlib.sha256(data).hexdigest()
 
+def sdk_include(token, sdk_build, old_source, new_source, cwd):
+    old_source=old_source.resolve();new_source=new_source.resolve()
+    include=(sdk_build/token[2:]).resolve()
+    if include.is_relative_to(old_source):
+        return '-I'+os.path.relpath(new_source/include.relative_to(old_source),cwd.resolve())
+    return '-I'+str(include)
+
+def verification_descriptor(manifest, receipt):
+    descriptor={key:manifest[key] for key in ['schema','id','storeId','version','buildTag','engineFiles']}
+    descriptor.update(sourceReleaseDescriptor=1,sourceLockSHA256=receipt['sourceLockSHA256'],files=receipt['files'])
+    return descriptor
+
 def compile_runtime(source, sdk_source, sdk_build, output, lock, env):
     # Maintainer SDK input: the pinned Wine tree with its generated PE headers,
     # compiler driver/import libraries and XML archive. Every runtime C object is
@@ -86,9 +98,8 @@ def compile_runtime(source, sdk_source, sdk_build, output, lock, env):
         for token in rule(target):
             if token in ['-g','-gdwarf-4']:continue
             if token==target:token=Path(name).stem+'.o'
-            elif token==str(sdk_source/'libs/xml2'/name):token=os.path.relpath(xml/name,xml_objects)
-            elif token.startswith('-I'+str(sdk_source/'libs/xml2')):token='-I'+os.path.relpath(xml,xml_objects)+token[len('-I'+str(sdk_source/'libs/xml2')):]
-            elif token.startswith('-I') and not os.path.isabs(token[2:]):token='-I'+str(sdk_build/token[2:])
+            elif not token.startswith('-') and (sdk_build/token).resolve()==sdk_source/'libs/xml2'/name:token=os.path.relpath(xml/name,xml_objects)
+            elif token.startswith('-I'):token=sdk_include(token,sdk_build,sdk_source/'libs/xml2',xml,xml_objects)
             args.append(token)
         execute(args+['-ffile-prefix-map='+str(sdk_source)+'=/wine-source'],xml_objects,env=env)
     xml_archive=output/'libxml2.a'
@@ -102,20 +113,22 @@ def compile_runtime(source, sdk_source, sdk_build, output, lock, env):
         for token in cc:
             if token in ['-g','-gdwarf-4']:continue
             if token=='dlls/xgameruntime/x86_64-windows/xuser.o':token=obj.name
-            elif token==str(original/'xuser.c'):token=os.path.relpath(current/name,output)
-            elif token.startswith('-I'+str(original)):token='-I'+os.path.relpath(current,output)+token[len('-I'+str(original)):]
-            elif token.startswith('-I') and not os.path.isabs(token[2:]):token='-I'+str(sdk_build/token[2:])
+            elif not token.startswith('-') and (sdk_build/token).resolve()==original/'xuser.c':token=os.path.relpath(current/name,output)
+            elif token.startswith('-I'):token=sdk_include(token,sdk_build,original,current,output)
             args.append(token)
         args += ['-ffile-prefix-map='+str(sdk_source)+'=/wine-source','-ffile-prefix-map='+str(source)+'=/runtime-source']
         execute(args,output,env=env);objects[name[:-2]+'.o']=obj
     args=[]
     for token in link:
+        if token=='-Wl,--build-id':continue  # winegcc otherwise re-enables it after user linker flags
         if token=='dlls/xgameruntime/x86_64-windows/xgameruntime.dll':token=relative(output/'xgameruntime.dll')
-        elif token==str(original/'xgameruntime.spec'):token=relative(current/'xgameruntime.spec')
+        elif not token.startswith('-') and (sdk_build/token).resolve()==original/'xgameruntime.spec':token=relative(current/'xgameruntime.spec')
         elif token=='libs/xml2/x86_64-windows/libxml2.a':token=relative(xml_archive)
         elif token.startswith('dlls/xgameruntime/x86_64-windows/') and token.endswith('.o'):token=relative(objects[Path(token).name])
         args.append(token)
-    execute(args+['-Wl,--no-insert-timestamp'],sdk_build,env=env)
+    # SDK support objects contain build-path debug data. GNU's PE CodeView
+    # build ID hashes that data before stripping; omit that diagnostic ID.
+    execute(args+['-Wl,--no-insert-timestamp','-Wl,--build-id=none'],sdk_build,env=env)
     execute(['x86_64-w64-mingw32-strip','--strip-debug',output/'xgameruntime.dll'],REPO,env=env)
     # JSON array support is a required runtime dependency. Build it from the
     # same pinned Wine revision instead of trusting a stock Preview parser.
@@ -129,18 +142,18 @@ def compile_runtime(source, sdk_source, sdk_build, output, lock, env):
         for token in rule(target):
             if token in ['-g','-gdwarf-4']:continue
             if token==target:token=Path(name).stem+'.o'
-            elif token==str(sdk_source/'dlls/windows.web'/name):token=os.path.relpath(web_source/name,web_objects)
-            elif token.startswith('-I'+str(sdk_source/'dlls/windows.web')):token='-I'+os.path.relpath(web_source,web_objects)+token[len('-I'+str(sdk_source/'dlls/windows.web')):]
-            elif token.startswith('-I') and not os.path.isabs(token[2:]):token='-I'+str(sdk_build/token[2:])
+            elif not token.startswith('-') and (sdk_build/token).resolve()==sdk_source/'dlls/windows.web'/name:token=os.path.relpath(web_source/name,web_objects)
+            elif token.startswith('-I'):token=sdk_include(token,sdk_build,sdk_source/'dlls/windows.web',web_source,web_objects)
             args.append(token)
         execute(args+['-ffile-prefix-map='+str(sdk_source)+'=/wine-source'],web_objects,env=env)
     args=[]
     for token in rule('dlls/windows.web/x86_64-windows/windows.web.dll'):
+        if token=='-Wl,--build-id':continue
         if token=='dlls/windows.web/x86_64-windows/windows.web.dll':token=relative(output/'windows.web.dll')
-        elif token==str(sdk_source/'dlls/windows.web/windows.web.spec'):token=relative(web_source/'windows.web.spec')
+        elif not token.startswith('-') and (sdk_build/token).resolve()==sdk_source/'dlls/windows.web/windows.web.spec':token=relative(web_source/'windows.web.spec')
         elif token.startswith('dlls/windows.web/x86_64-windows/') and token.endswith('.o'):token=relative(web_objects/Path(token).name)
         args.append(token)
-    execute(args+['-Wl,--no-insert-timestamp'],sdk_build,env=env)
+    execute(args+['-Wl,--no-insert-timestamp','-Wl,--build-id=none'],sdk_build,env=env)
     execute(['x86_64-w64-mingw32-strip','--strip-debug',output/'windows.web.dll'],REPO,env=env)
     return files
 
@@ -211,6 +224,11 @@ def main():
     for patch in json.loads((REPO/'scripts/runtime-patches.lock.json').read_text())['patches']:
         target=recipe/patch['file'];target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(REPO/patch['file'],target)
     shutil.copytree(PACK,recipe/'assets/fh5-preview',ignore=shutil.ignore_patterns('payload','source-release','manifest.json'))
+    # Verification needs the candidate/engine pins, but including the final
+    # manifest would recursively embed this archive's own hash.
+    manifest=json.loads((PACK/'manifest.json').read_text())
+    descriptor=verification_descriptor(manifest,receipt)
+    (recipe/'assets/fh5-preview/verification.json').write_text(json.dumps(descriptor,indent=2,sort_keys=True)+'\n')
     archive=output/'fh5-preview-v1-source.tar.gz'
     with archive.open('wb') as raw,gzip.GzipFile(fileobj=raw,mode='wb',mtime=lock['sourceDateEpoch'],filename='') as zipped,tarfile.open(fileobj=zipped,mode='w') as tar:
         for folder in ['source','runtime-source','corresponding-source']:
