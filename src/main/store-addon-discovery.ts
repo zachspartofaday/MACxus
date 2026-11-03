@@ -31,13 +31,34 @@ export async function loadAddonLibrary(backendBinary: string, market: string, si
   for (const key of Object.keys(env)) if (/^(?:XODUS_|XUSER_|WINE|CX_|MACXUS_|NEXUS_|DYLD_)/.test(key)) delete env[key];
   env.XODUS_LOG = 'error';
   return new Promise((resolve, reject) => {
-    const child = spawn(backendBinary, ['library', '--json', '--market', market], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const grouped = process.platform !== 'win32';
+    const child = spawn(backendBinary, ['library', '--json', '--market', market], { env, detached: grouped, stdio: ['ignore', 'pipe', 'pipe'] });
     const buffers: Buffer[] = [];
-    let size = 0, failed = false, escalation: NodeJS.Timeout | undefined;
+    let size = 0, failed = false, exited = false, closed = false, cleaned = false;
+    let exitCode: number | null = null, escalation: NodeJS.Timeout | undefined;
+    const killOwned = (kind: NodeJS.Signals) => {
+      try {
+        if (grouped && child.pid) process.kill(-child.pid, kind);
+        else child.kill(kind);
+      } catch { /* An already exited owned process/group needs no signal. */ }
+    };
+    const finish = () => {
+      if (!closed || (failed && !cleaned)) return;
+      clearTimeout(deadline); clearTimeout(escalation); signal.removeEventListener('abort', terminate);
+      if (failed || signal.aborted || exitCode !== 0) { reject(Error('Account inventory unavailable.')); return; }
+      try { resolve(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers)))); }
+      catch { reject(Error('Invalid account inventory.')); }
+    };
     const terminate = () => {
       if (failed) return;
-      failed = true; child.kill('SIGTERM');
-      escalation = setTimeout(() => child.kill('SIGKILL'), 1000);
+      failed = true; killOwned('SIGTERM');
+      escalation = setTimeout(() => {
+        killOwned('SIGKILL'); cleaned = true;
+        // A descendant can inherit pipes, including after leaving our process
+        // group. Close only after the direct helper has verifiably exited.
+        if (exited) { child.stdout.destroy(); child.stderr.destroy(); }
+        finish();
+      }, 1000);
     };
     const deadline = setTimeout(terminate, 50_000);
     signal.addEventListener('abort', terminate, { once: true });
@@ -50,12 +71,16 @@ export async function loadAddonLibrary(backendBinary: string, market: string, si
     });
     // Account diagnostics are never returned to the game or launcher logs.
     child.stderr.resume();
-    child.once('error', () => { failed = true; });
+    child.once('error', () => {
+      if (!child.pid) { failed = cleaned = true; }
+      else terminate();
+    });
+    child.once('exit', () => {
+      exited = true;
+      if (failed && cleaned) { child.stdout.destroy(); child.stderr.destroy(); }
+    });
     child.once('close', code => {
-      clearTimeout(deadline); clearTimeout(escalation); signal.removeEventListener('abort', terminate);
-      if (failed || signal.aborted || code !== 0) { reject(Error('Account inventory unavailable.')); return; }
-      try { resolve(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers)))); }
-      catch { reject(Error('Invalid account inventory.')); }
+      closed = true; exitCode = code; finish();
     });
   });
 }
