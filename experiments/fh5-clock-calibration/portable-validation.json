@@ -216,7 +216,6 @@
     }
   },
   "limits": [
-    "Normal Play trial of integrated six-module application pending",
     "Displayed latency is not independently measured input-to-display latency",
     "Actual host sleep/resume and long-session drift untested",
     "Single specified adapter/engine only",
@@ -230,5 +229,6 @@
     "runnerResolution": "Runner now reconstructs current production source directly; no duplicate native export or hook transformation",
     "runnerValidation": "7 unit/reconstruction tests reach compilation; full documented command against linked-DLL template passes and preserves sentinel",
     "independentRebuild": "All six production payloads, receipt and archive reproduced exactly; runtime/launcher tests passed"
-  }
+  },
+  "integratedNormalPlay": "User confirmed driving/benchmark works and latency is plausible; exact packaged value not supplied. See normal-play-acceptance.json."
 }
