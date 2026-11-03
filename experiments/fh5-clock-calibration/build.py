@@ -1,16 +1,50 @@
 """Build and verify an opt-in clock experiment. Never launches FH5 or uses accounts."""
 from pathlib import Path
-import argparse, os, subprocess, shutil, json, secrets, hashlib
+import argparse, os, subprocess, shutil, json, secrets, hashlib, stat, tempfile
 
 HERE=Path(__file__).resolve().parent
 REPO=HERE.parents[1]
+
+def validate_prefix(prefix):
+    """Check write ancestors and C: before any process uses a copied prefix."""
+    prefix=Path(prefix)
+    for relative in ['', 'drive_c', 'drive_c/windows', 'drive_c/windows/system32', 'dosdevices']:
+        target=prefix/relative
+        if not stat.S_ISDIR(target.lstat().st_mode):
+            raise ValueError('Synthetic prefix directory is missing or linked: '+relative)
+    mapping=prefix/'dosdevices/c:'
+    if not mapping.is_symlink() or mapping.resolve(strict=True)!=(prefix/'drive_c').resolve(strict=True):
+        raise ValueError('Synthetic prefix C: must resolve to its own drive_c')
+    for name in ['system.reg','user.reg','userdef.reg']:
+        target=prefix/name
+        if target.exists() or target.is_symlink():
+            if not stat.S_ISREG(target.lstat().st_mode):
+                raise ValueError('Synthetic prefix registry file is linked: '+name)
+    return prefix/'drive_c/windows/system32'
+
+def install_clock(prefix, source):
+    system=validate_prefix(prefix)
+    # Copy to an exclusively created sibling, then replace the directory entry.
+    # A preserved DLL symlink/hardlink is detached, never written through.
+    fd,temporary=tempfile.mkstemp(prefix='.macxus-clock-',suffix='.tmp',dir=system)
+    try:
+        with os.fdopen(fd,'wb') as out,Path(source).open('rb') as data:
+            shutil.copyfileobj(data,out)
+        os.chmod(temporary,0o644)
+        os.replace(temporary,system/'macxus-clock.dll')
+    finally:
+        if os.path.lexists(temporary):os.unlink(temporary)
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('output',type=Path);p.add_argument('--sdk',required=True,type=Path)
     p.add_argument('--engine',required=True,type=Path)
     p.add_argument('--prefix-template',type=Path,help='Optional previously account-free synthetic prefix; never supply an account/game bottle')
-    a=p.parse_args();r=a.output.resolve();r.mkdir(parents=True,exist_ok=False)
+    a=p.parse_args();r=a.output.resolve()
     sdk=a.sdk.resolve();src=sdk/'wine-src';build=sdk/'wine-build';cx=a.engine.resolve()
+    for forbidden in [HERE,REPO/'assets/fh5-preview',sdk,cx,*([a.prefix_template.resolve()] if a.prefix_template else [])]:
+        if r==forbidden or forbidden in r.parents:raise ValueError('Keep output outside source, engine, SDK and template trees')
+    r.mkdir(parents=True,exist_ok=False)
     env={k:v for k,v in os.environ.items() if not k.startswith(('WINE','CX_','DYLD_','MACXUS_','XODUS_','XUSER_','NEXUS_'))}
     results=[]
     def run(args,name=None,extra=None,cwd=None,timeout=60):
@@ -56,14 +90,15 @@ def main():
     run([r/'math-probe'],'math')
     run([r/'native-probe'],'native')
     prefix=r/'prefix'
-    if a.prefix_template:shutil.copytree(a.prefix_template.resolve(),prefix,symlinks=True)
+    if a.prefix_template:
+        shutil.copytree(a.prefix_template.resolve(),prefix,symlinks=True)
+        validate_prefix(prefix)
     else:prefix.mkdir()
     env.update(WINEPREFIX=str(prefix),CX_ROOT=str(cx),WINESERVER=str(cx/'bin/wineserver'),WINEDEBUG='-all,err+all',WINEDLLPATH=':'.join(map(str,[r/'dlls',cx/'lib/apple_gptk/wine/x86_64-windows',cx/'lib/apple_gptk/wine',cx/'lib/wine/x86_64-windows',cx/'lib/wine'])),WINEDLLOVERRIDES='winemenubuilder.exe,winedbg.exe=d;macxus-clock=b;d3d12=n,b')
     wine=cx/'lib/wine/x86_64-unix/wine'
     try:
         if not a.prefix_template:run([wine,'wineboot','--init'],'wineboot',timeout=120)
-        system=prefix/'drive_c/windows/system32'
-        shutil.copyfile(r/'dlls/x86_64-windows/macxus-clock.dll',system/'macxus-clock.dll')
+        install_clock(prefix,r/'dlls/x86_64-windows/macxus-clock.dll')
         run([wine,r/'clock-probe.exe','--missing-bridge'],'missing-bridge')
         run([wine,r/'disabled-hook-probe.exe'],'disabled-hook')
         injected={'DYLD_INSERT_LIBRARIES':str(r/'macxus-metal4-timestamps.dylib'),'MACXUS_GPU_QUERY_COOKIE':secrets.token_hex(8),'MACXUS_GPU_BRIDGE_LOG':str(r/'native-bridge'),'MACXUS_GPU_BRIDGE_PER_PROCESS':'1','D3DM_MTL4':'1'}

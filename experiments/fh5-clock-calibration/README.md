@@ -44,6 +44,11 @@ The SDK layout is `wine-src` and `wine-build`, prepared by the pack's SDK recipe
 The optional `--prefix-template` is only for a previously synthetic account-free
 prefix. The runner copies it into the new output, never edits the template, and
 stops only the output's own Wine server. It launches no FH5 or account service.
+Before Wine starts, linked write-directory ancestors, an external C: mapping and
+linked registry files are rejected. The calibration DLL is copied into an
+exclusively created sibling and atomically replaces its directory entry, so a
+preserved template DLL link is detached without writing through it. Output
+cannot be placed inside the template, SDK, engine or experiment source trees.
 The original vendor loader ignores DYLD injection; using it correctly exercises
 the unsupported path but cannot accept the injected calibration path.
 

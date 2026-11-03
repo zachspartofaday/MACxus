@@ -93,5 +93,15 @@
     "Actual sleep/resume untested; simulated offset-transition cases only",
     "Private prepared loader needed for native injection; original loader exercises missing-bridge fallback",
     "No production module staging or reproducibility acceptance"
-  ]
+  ],
+  "independentReview": {
+    "head": "54e5a79a05066fbfa25bfddfa6d5ce74846acfbf",
+    "findings": [
+      "P2 template DLL symlink overwrite in runner"
+    ],
+    "clockMathAndABIFindings": [],
+    "rerunEvidence": "Independent real native, PE and D3D12 tests, additional math/fault injection and cold concurrency/reload tests passed",
+    "runnerResolution": "Exclusive sibling copy with atomic replacement; linked write ancestors, external C: and linked registry files rejected; output/template overlap rejected",
+    "regressions": "6 isolation tests passed; full runner rerun with linked DLL template passed and sentinel unchanged"
+  }
 }
