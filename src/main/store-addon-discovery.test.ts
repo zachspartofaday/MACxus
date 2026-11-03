@@ -2,9 +2,40 @@ import { expect, it, vi } from 'vitest';
 import { promises as fs, watch } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { createConnection } from 'node:net';
+import { once } from 'node:events';
+import { startXodusBridge } from './xodus-service.js';
 import { createStoreAddonDiscovery, parseAddonDiscoveryRequest, type AddonDiscoveryDeps } from './store-addon-discovery.js';
 const parent = 'B00000000001', addon = 'B00000000002', other = 'B00000000003';
 const request = Buffer.from(`<Request><ParentProductId>${parent}</ParentProductId><Market>US</Market></Request>`);
+
+it('settles cancelled inventory after an exited helper leaves inherited pipes open', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'addon inherited pipes '));
+  const binary = path.join(root, 'backend'), marker = path.join(root, 'ready');
+  const childCode = `process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(${JSON.stringify(marker)},String(process.pid));setInterval(()=>{},1000);`;
+  await fs.writeFile(binary, `#!/usr/bin/env node\nrequire('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(childCode)}],{stdio:['ignore',1,2]});setInterval(()=>{},1000);\n`, { mode: 0o700 });
+  const watcher = watch(root);
+  const ready = new Promise<void>(resolve => watcher.on('change', (_, file) => { if (file === 'ready') resolve(); }));
+  let pid: number | undefined;
+  let inventory!: Promise<Buffer>;
+  const handler = createStoreAddonDiscovery(binary, parent);
+  const bridge = await startXodusBridge('/unused.sock', (bytes, signal) => inventory = handler(bytes, signal));
+  const client = createConnection(bridge.port, '127.0.0.1');
+  try {
+    await once(client, 'connect');
+    const header = Buffer.alloc(8); header.writeUInt32LE(0x58445358); header.writeUInt16LE(0x7f01, 4); header.writeUInt16LE(request.length, 6);
+    client.write(Buffer.concat([Buffer.from(bridge.key), header, request]));
+    await ready; pid = Number(await fs.readFile(marker, 'utf8'));
+    await bridge.stop();
+    expect((await inventory).toString()).toContain('2147500036');
+    // Group escalation must reach the pipe holder even after its parent exits.
+    await vi.waitFor(() => expect(() => process.kill(pid!, 0)).toThrow(), { timeout: 2000 });
+  } finally {
+    watcher.close(); client.destroy(); await bridge.stop();
+    if (pid) { try { process.kill(pid, 'SIGKILL'); } catch { /* reaped */ } }
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
 function fixture() {
   const library = vi.fn(async () => ({ schema: 1, skippedEntitlements: 0, entitlements: [parent, addon, other].map(productId => ({ productId })) }));
   const metadata = vi.fn(async (url: URL): Promise<unknown> => url.hostname.startsWith('displaycatalog') ? { Products: [
