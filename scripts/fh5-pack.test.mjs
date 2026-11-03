@@ -8,7 +8,7 @@ const hash = data => createHash('sha256').update(data).digest('hex');
 async function fixture() {
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'fh5 distribution paths '));const app=path.join(root,'app'),assets=path.join(app,'assets/fh5-preview'),bundle=path.join(root,'build');
  await fs.mkdir(path.join(bundle,'payload'),{recursive:true});await fs.mkdir(assets,{recursive:true});
- const files=Object.fromEntries(['d3d12.dll','macxus-metal4-timestamps.dylib','windows.web.dll','xgameruntime.dll'].map(name=>[name,hash('owned-'+name)]));
+ const files=Object.fromEntries(['d3d12.dll','macxus-metal4-timestamps.dylib','windows.web.dll','xgameruntime.dll','macxus-clock.dll','macxus-clock.so'].map(name=>[name,hash('owned-'+name)]));
  for(const name of Object.keys(files))await fs.writeFile(path.join(bundle,'payload',name),'owned-'+name);
  const sourceArchive={name:'fh5-preview-v1-source.tar.gz',sha256:hash('complete-source-fixture')};
  await fs.writeFile(path.join(bundle,sourceArchive.name),'complete-source-fixture');

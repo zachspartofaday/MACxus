@@ -19,7 +19,7 @@ def main():
     if hashlib.sha256((assets/'source.lock.json').read_bytes()).hexdigest()!=manifest['sourceLockSHA256']:raise ValueError('Verification source lock changed')
     if receipt['files']!=manifest['files']:raise ValueError('Build is not the committed pack candidate')
     for name,expected in receipt['files'].items():
-        if name not in ['d3d12.dll','xgameruntime.dll','windows.web.dll','macxus-metal4-timestamps.dylib'] or hashlib.sha256((build/'payload'/name).read_bytes()).hexdigest()!=expected:raise ValueError('Pack payload changed')
+        if name not in ['d3d12.dll','xgameruntime.dll','windows.web.dll','macxus-metal4-timestamps.dylib','macxus-clock.dll','macxus-clock.so'] or hashlib.sha256((build/'payload'/name).read_bytes()).hexdigest()!=expected:raise ValueError('Pack payload changed')
     if args.check_inputs_only:
         (root/'inputs.json').write_text(json.dumps({'payloadVerified':True,'sourceLockVerified':True,'engineVerified':False,'gameLaunched':False,'accountUsed':False})+'\n')
         print('Source-release descriptor and build payload verified; no engine or runtime accessed.');return
@@ -41,10 +41,16 @@ def main():
     try:
         wine=engine/'lib/wine/x86_64-unix/wine';run('wineboot',[wine,'wineboot','--init'])
         system=prefix/'drive_c/windows/system32'
-        for name in ['xgameruntime.dll','windows.web.dll']:
+        for name in ['xgameruntime.dll','windows.web.dll','macxus-clock.dll']:
             temporary=system/(name+'.pack');shutil.copyfile(build/'payload'/name,temporary);temporary.replace(system/name)
         for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','store-addons']:
             run(name,[wine,build/'probes'/(name+'.exe')])
+        # The unmodified vendor loader correctly refuses native injection. This
+        # control accepts failure semantics only; enabled PE/native calibration
+        # is separately tested through the prepared game wrapper.
+        run('clock-missing-bridge',[wine,build/'probes/clock-calibration.exe','--missing-bridge'],{'WINEDLLPATH':str(build/'payload')+':'+str(engine/'lib/wine'),'WINEDLLOVERRIDES':env['WINEDLLOVERRIDES']+';macxus-clock=b'})
+        run('clock-math',[build/'probes/clock-math'])
+        run('clock-native',[build/'probes/clock-native'])
         for name in ['metal4-counter-probe','metal4-state-probe','metal4-order-probe','metal4-lifetime-probe']:
             # State/order probes exercise the injected bridge, not raw Metal.
             # Counter/lifetime controls deliberately run without injection.

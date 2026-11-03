@@ -10,7 +10,7 @@ import type { ProtonRunner } from './proton.js';
 
 export const FH5_STORE_ID = '9NNX1VVR3KNQ';
 const assetRoot = fileURLToPath(new URL('../../assets/fh5-preview', import.meta.url));
-const payloadNames = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll'];
+const payloadNames = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
 const engineNames = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
 const digest = (data: Buffer) => createHash('sha256').update(data).digest('hex');
 interface Manifest {
@@ -145,6 +145,17 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
     await fs.writeFile(temporary, payload.get('macxus-metal4-timestamps.dylib')!, { flag: 'wx', mode: 0o755 });
     try { await fs.rename(temporary, nativeBridge); } finally { await fs.unlink(temporary).catch(() => undefined); }
   }
+  const clockDlls = await directory(nativeRoot, 'clock-dlls');
+  for (const [architecture, name] of [['x86_64-windows', 'macxus-clock.dll'], ['x86_64-unix', 'macxus-clock.so']]) {
+    const destination = path.join(await directory(clockDlls, architecture), name);
+    try { await verified(destination, manifest.files[name]); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      const temporary = destination + '.tmp-' + process.pid;
+      await fs.writeFile(temporary, payload.get(name)!, { flag: 'wx', mode: 0o644 });
+      try { await fs.rename(temporary, destination); } finally { await fs.unlink(temporary).catch(() => undefined); }
+    }
+  }
   const bottles = await directory(root, 'bottles');
   // Validate any existing setup paths before the vendor runner can update them.
   const prefix = path.join(bottles, 'xbox');
@@ -153,7 +164,7 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
   if (path.resolve(runner.compatibilityDataPath) !== prefix) throw Error('FH5 requires its dedicated bottle.');
   await validateCompatibilityPrefix(prefix, bottles, { configuration: [] });
   await plainDirectory(prefix, 'drive_c', 'windows', 'system32');
-  for (const name of ['d3d12.dll', 'xgameruntime.dll', 'windows.web.dll']) {
+  for (const name of ['d3d12.dll', 'xgameruntime.dll', 'windows.web.dll', 'macxus-clock.dll']) {
     const target = path.join(prefix, 'drive_c/windows/system32', name), temporary = target + '.fh5-' + process.pid;
     await fs.writeFile(temporary, payload.get(name)!, { flag: 'wx', mode: 0o644 });
     try { await fs.rename(temporary, target); } finally { await fs.unlink(temporary).catch(() => undefined); }
@@ -165,12 +176,13 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
     CX_BOTTLE_PATH: bottles, CX_BOTTLE: 'xbox', WINEPREFIX: prefix, CX_ROOT: engine.root,
     WINELOADER: native, WINESERVER: engine.wineserver, CX_GRAPHICS_BACKEND: 'd3dmetal', CX_ACTIVE_GRAPHICS_BACKEND: 'd3dmetal',
     CX_D3DMETALPATH: path.join(engine.root, 'lib/apple_gptk/external'),
-    WINEDLLPATH: [path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows'), path.join(engine.root, 'lib/apple_gptk/wine'), path.join(engine.root, 'lib/wine/x86_64-windows'), path.join(engine.root, 'lib/wine')].join(':'),
+    WINEDLLPATH: [clockDlls, path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows'), path.join(engine.root, 'lib/apple_gptk/wine'), path.join(engine.root, 'lib/wine/x86_64-windows'), path.join(engine.root, 'lib/wine')].join(':'),
     DYLD_FALLBACK_LIBRARY_PATH: [path.join(engine.root, 'lib/apple_gptk/external'), path.join(engine.root, 'lib')].join(':'),
     DYLD_INSERT_LIBRARIES: nativeBridge,
     MACXUS_GPU_BRIDGE_LOG: path.join(log, 'timestamps'), MACXUS_GPU_BRIDGE_PER_PROCESS: '1',
     MACXUS_GPU_QUERY_COOKIE: randomBytes(8).toString('hex'),
     D3DM_MTL4: '1', MACXUS_PROCESS_OBSERVER: '1', MACXUS_TIMESTAMP_ONLY: '1', MACXUS_APPEND_ONLY: '1', MACXUS_FH5_UNUSED_BLEND: '1',
+    MACXUS_GPU_CLOCK_CALIBRATION: '1',
     MACXUS_FH5_DESCRIPTOR_DATA: '1', MACXUS_DUAL_UDP_TTL: '1', MACXUS_COMMIT_ACCOUNTING: '1', HB_TSSHIM_DEBUG: '0',
     D3DM_VENDOR_ID: '0x10de', D3DM_DEVICE_ID: '0x2786', D3DM_DEVICE_DESCRIPTION: 'NVIDIA GeForce RTX 4070',
     HB_D3D12_REAL: 'Z:' + path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll').replaceAll('/', '\\'),
@@ -179,7 +191,7 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
   const wrapper = path.join(bottles, 'fh5-game-wine');
   const temporary = wrapper + '.tmp-' + process.pid;
   await fs.writeFile(temporary, '#!/bin/sh\n' + Object.entries(environment).map(([name, value]) => `export ${name}=${shellQuote(value)}`).join('\n') +
-    '\nexport WINEDLLOVERRIDES="d3d12=n,b;${WINEDLLOVERRIDES:-}"\n' + `launch_status=0\n${shellQuote(native)} "$@" || launch_status=$?\n${shellQuote(engine.wineserver)} -w\nexit "$launch_status"\n`, { flag: 'wx', mode: 0o700 });
+    '\nexport WINEDLLOVERRIDES="d3d12=n,b;macxus-clock=b;${WINEDLLOVERRIDES:-}"\n' + `launch_status=0\n${shellQuote(native)} "$@" || launch_status=$?\n${shellQuote(engine.wineserver)} -w\nexit "$launch_status"\n`, { flag: 'wx', mode: 0o700 });
   await fs.rename(temporary, wrapper);
   request.log('FH5 Preview pack enabled in its dedicated bottle; Metal 4 and guarded runtime fixes active.');
   return { runner: { ...runner, launchCommand: wrapper }, addonDiscoveryParent: FH5_STORE_ID };

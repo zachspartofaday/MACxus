@@ -1,10 +1,14 @@
 # Experimental FH5 clock calibration
 
-This is a separate opt-in experiment on top of the accepted FH5 Preview pack,
-not an update to its payload, manifest, source archive or installed application.
+The initial opt-in experiment is preserved here, alongside the evidence for its
+subsequent portable integration in `assets/fh5-preview`. The independently reviewed
+prototype and private game trial preceded changes to that pack. Its installed
+normal-Play baseline was preserved throughout the trial.
 No game code or vendor implementation is included. It targets the same single
-M5 Max / Rosetta Preview 20261015 / Metal 4 configuration. It has no game
-acceptance yet. It does not establish input-to-display latency or performance.
+M5 Max / Rosetta Preview 20261015 / Metal 4 configuration. The user completed driving/benchmark in the private overlay and supplied a
+plausible average-latency display of 61.1. The integrated six-module application
+still needs its own normal-Play trial. This does not establish input-to-display
+latency or performance.
 
 The existing queue's `GetClockCalibration` returns `E_NOTIMPL`. Prior live traces
 observe FH5 calling it repeatedly. The experiment adds a Wine builtin PE module
@@ -60,7 +64,9 @@ under that ignored directory. Tests cover mathematical offset/error bounds,
 concurrent callers, unsupported/null paths, disabled hook contracts, and 32
 real D3D12 query submissions with reset, repeated resolve and future queue waits.
 
-Portable production packaging, pinning/reproducibility of the new modules and
-normal Play integration remain follow-ups. This experiment must not be staged
-as the existing accepted pack. Keep raw logs and any future private controller,
+`portable-validation.json` records six-module payload/source reproduction across
+two output roots, a real full build from the extracted standalone archive, all
+offline probes and the actual launcher-generated calibration/query wrapper.
+The integration still needs fresh independent review and normal-Play acceptance.
+Do not stage the original prototype output as an accepted production pack. Keep raw logs and any future private controller,
 prefix, account details or game files out of contribution artifacts.

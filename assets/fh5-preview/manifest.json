@@ -4,7 +4,7 @@
   "storeId": "9NNX1VVR3KNQ",
   "version": "20261015",
   "buildTag": "cxpreview-20261015-rc1",
-  "sourceLockSHA256": "7893b9658f5677842e3c18d18cf0cdf8f31c25bbd0205670d7a605a231d08015",
+  "sourceLockSHA256": "5c3dcf279f39509c426c5bdb7ff8381bf8383dee78ce9d6d7cf335180c1ad8ee",
   "loaderEntitlementsSHA256": "744210d0e90c98700d63d865654ae3ac5a4e9325969bf8d43adb6b5250d57f46",
   "preparedLoaderSHA256": "0179c0067abe71215c882593dc50528ce3b508de200c208b5957cdf3f715a91a",
   "engineFiles": {
@@ -17,20 +17,22 @@
     "lib/apple_gptk/wine/x86_64-windows/d3d12core.dll": "a49a6e2c552c660f1c68c9e6495c3553b2f31f37a967a96c244119dd44f67119"
   },
   "files": {
-    "macxus-metal4-timestamps.dylib": "cc7988fd67df029acd288f23184d34fc1d05497a52b0d9a61a88477eb32ef677",
+    "macxus-metal4-timestamps.dylib": "f77cb14a1c0c5f4ced62a4c6ef70550358ad0a5e7617047a01060891cc081e1e",
     "windows.web.dll": "d96352f9c95bde5c1b1c790b5eda80ea06b0772b9d44508ed8b6fb1aaa6e68d6",
-    "d3d12.dll": "5c0e9992cda8da8ab11b973ff98df03b794c4b2fe2a10b1cf9c7d26a46079604",
+    "macxus-clock.dll": "1de8135b98f479edd050de1d0f496a771c42fc4143d0c4f3679ce83e7d3b6026",
+    "d3d12.dll": "4834ca3c96d8e2673b711536d124dc3a2ce1cefb4b1f18931ac0b5b41ac2960d",
+    "macxus-clock.so": "690c1bdef5133b445ddf9818b38aa4cd6ff381cabbb153d2e580db52bf372ab4",
     "xgameruntime.dll": "7f3b8bc86edbaa3d85c6579160c32c14afa8d3961a164787e1434474d7411636"
   },
-  "gameValidation": "pending portable-pack game trial; no game launch performed",
+  "gameValidation": "Original portable pack normal Play/multiplayer accepted; calibration overlay driving/benchmark accepted with plausible 61.1 display; integrated calibrated normal Play trial pending",
   "knownLimitations": [
-    "Clock calibration unavailable; latency sentinel unresolved",
+    "Latency display is plausible in overlay trial; input-to-display accuracy, actual sleep/resume and long-session drift remain unvalidated",
     "Black road surfaces remain",
     "Metal 4 timestamp slot retirement has a bounded 4096-slot implementation",
     "Native Apple identity / DLSS pairing remains unvalidated; this pack retains NVIDIA compatibility identity"
   ],
   "sourceArchive": {
     "name": "fh5-preview-v1-source.tar.gz",
-    "sha256": "9f4aa24fb5983ecc8f1a1105cd1ca4df4fb47d319a32262ec364cf7da6ab8e57"
+    "sha256": "ec53017385c02729017d7cac1dbedc11be476456e2965d34256d29749a48aeeb"
   }
 }

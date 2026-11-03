@@ -4,8 +4,12 @@ An opt-in, source-built compatibility pack for the **FH5 Microsoft Store package
 (`9NNX1VVR3KNQ`) on **M5 Max**, macOS 26+, CrossOver Preview **Rosetta 20261015**
 (build `cxpreview-20261015-rc1`). Metal 4 is required. This is the portable
 packaging of components previously exercised in private FH5 driving, benchmark
-and online tests. **The assembled portable pack still needs its own game trial.**
-No game was launched while preparing this contribution.
+and online tests. The original portable pack passed normal Play and multiplayer
+on this target. The separate calibration overlay completed a user benchmark with
+a plausible average-latency display of 61.1. The integrated calibration payload
+still needs its own normal-Play trial; this is not input-to-display measurement
+acceptance. See `experiments/fh5-preview-portable/normal-play-acceptance.json` and
+`experiments/fh5-clock-calibration` in the repository.
 
 The game’s launch settings expose “FH5 Preview compatibility pack.” It is off by
 default. Enabling it requires an app build containing the verified payload. The
@@ -32,7 +36,12 @@ uninstall script or modification of the original game/application.
   bridge (#25). Catalog metadata supplies candidates; the runtime separately
   verifies fresh signed exact-SKU receipts. Unknown/incomplete inventory fails
   conservatively. Public metadata never grants ownership.
-- Real Metal 4 GPU query timestamps; explicit input-layout offsets; the tested
+- Real Metal 4 GPU query timestamps and paired GPU/QPC calibration through an
+  owned Wine PE/Unix companion. GPU samples are converted to query-frequency
+  ticks; absolute CPU samples are mapped into Preview's continuous 10 MHz QPC
+  domain on each call and checked against guest QPC brackets. Missing support,
+  sleep transitions or invalid pairs fail without replacing caller outputs.
+- Explicit input-layout offsets; the tested
   absent-render-target blend adjustment; guest committed-memory accounting and
   dual-stack UDP TTL handling. Normal diagnostic observers remain off.
 - The FH5 descriptor adapter checks the executable name, x64 PE timestamp and
@@ -42,7 +51,7 @@ uninstall script or modification of the original game/application.
 
 The pack retains NVIDIA compatibility identity. Native Apple identity with DLSS
 is unvalidated; it is not enabled by this recipe. Black road regions remain,
-clock calibration is unavailable (latency reporting can show a sentinel), and
+actual sleep/resume and long-session calibration drift remain unvalidated, and
 Metal query-identity retirement remains a bounded 4096-slot implementation.
 No all-modes, all-game-builds, Steam-edition or long-session acceptance is claimed.
 
@@ -77,7 +86,7 @@ node scripts/prepare-compatibility-packs.mjs --pack fh5-preview-v1 \
 
 `--sources-only` on the build command reconstructs and verifies the locked
 runtime/graphics sources without compiling. Full builds produce `build.json`,
-four payload modules, synthetic probes, and the corresponding-source archive.
+six payload modules, synthetic probes, and the corresponding-source archive.
 Staging accepts only the committed manifest hashes; changed artifacts require
 validation and a reviewed manifest update. Source-path mappings, stable PE time
 settings and a stable Mach-O install name prevent checkout paths from becoming
@@ -87,7 +96,10 @@ The verification command starts only synthetic account-free probes in a new
 prefix and stops only that prefix afterward. It never starts an account service
 or FH5. It covers allocator guards, layout/blend contracts, memory clock-reporting
 contracts, async lifetime, add-on proof/provider behavior, and native Metal 4
-counter/state/order/lifetime probes. Offline checks do not replace game acceptance.
+counter/state/order/lifetime probes, calibration math/native counter brackets and
+missing-bridge PE semantics. The enabled guest calibration and D3D12 hook are
+validated separately with the prepared private loader, because the installed
+vendor loader ignores DYLD injection. Offline checks do not replace game acceptance.
 
 ## Source distribution
 
