@@ -16,7 +16,7 @@
     "source/runtime.patch": "5c76f0a09e5bd4742f718a37ad1267811d9a4771235c1882bd76b8757f11721b",
     "source/shim/blend_usage_observer.h": "d1dc4b375880d08e11dac7f70ca57ba4918df0fdbc30cb4d7cbcf3320770a12a",
     "source/shim/commit_accounting.h": "e29c4e0fb0263efa7930180a1fcee9e3bb204f9f398533a945cb70ed0d77177b",
-    "source/shim/d3d12.c": "baea1f0f8458079bb002ebfbea9b63d63d68773c3c34d7592fc3c36037d20011",
+    "source/shim/d3d12.c": "7256fe7f2ebfe415b713dda86b9b57a2698138cbd1267830b42cfc7578536e3d",
     "source/shim/d3d12.def": "cb7ab7efe42b1486291608bae066883a31cca04af3a2a0eb90036dcc3c469183",
     "source/shim/dxil_shadingrate.c": "e271839f9e556ac06b82ed0449e7012b3278a8579918a31c5673bc179f57824d",
     "source/shim/dxil_shadingrate.h": "be65458746a1c0f8769f4957a9159a320b64a38652f9145b9a5547107c433bd3",
@@ -48,7 +48,8 @@
     "COPYING.GPL-3.0": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
     "COPYING.LGPL-2.1": "9f3f04d139eb08ddc28cbf7276a2963ba44141016a077ce5f3748fee5b61d02f",
     "source/shim/ORIGIN.md": "c1204fd1ccdb0158a1d39d62c48dee22d29343e10a7d36071b6186bccc85bc11",
-    "source/tests/store-addons-probe.c": "7a005ffe3d8b1b50cc8cbedaa2cd70e7e69bc8b47353318a7fb5395389d39a36"
+    "source/tests/store-addons-probe.c": "7a005ffe3d8b1b50cc8cbedaa2cd70e7e69bc8b47353318a7fb5395389d39a36",
+    "source/tests/stream-debug-contracts.c": "93b66f84e81a195b6946e4331c14c6615e06a7febf3c1a93e41a12b34955b230"
   },
   "runtimeTargetSHA256": {
     "dlls/xgameruntime/LICENSE": "e237fa56668030e928551ddd60f05df5fe957f75eab874bbd017e085ed722e7c",

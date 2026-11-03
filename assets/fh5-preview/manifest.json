@@ -4,7 +4,7 @@
   "storeId": "9NNX1VVR3KNQ",
   "version": "20261015",
   "buildTag": "cxpreview-20261015-rc1",
-  "sourceLockSHA256": "58583238c89874c57d9aed1b214308ffddb3f1ff4465f28a3849edad5d525a1b",
+  "sourceLockSHA256": "7893b9658f5677842e3c18d18cf0cdf8f31c25bbd0205670d7a605a231d08015",
   "loaderEntitlementsSHA256": "744210d0e90c98700d63d865654ae3ac5a4e9325969bf8d43adb6b5250d57f46",
   "preparedLoaderSHA256": "0179c0067abe71215c882593dc50528ce3b508de200c208b5957cdf3f715a91a",
   "engineFiles": {
@@ -19,7 +19,7 @@
   "files": {
     "macxus-metal4-timestamps.dylib": "cc7988fd67df029acd288f23184d34fc1d05497a52b0d9a61a88477eb32ef677",
     "windows.web.dll": "ea99d7b4fccbfb018b63696a369dfd471403d0e04d846c6663e3908c95a5e6da",
-    "d3d12.dll": "4c7d7fa707c0c6960f5b2063bce88b6f713f31c8f0808c6127f34c13d6ccd2aa",
+    "d3d12.dll": "5c0e9992cda8da8ab11b973ff98df03b794c4b2fe2a10b1cf9c7d26a46079604",
     "xgameruntime.dll": "72ea1c762e0cb6d81bfb5f656364c686bd01f07d3266095ce8a9352864557107"
   },
   "gameValidation": "pending portable-pack game trial; no game launch performed",
@@ -31,6 +31,6 @@
   ],
   "sourceArchive": {
     "name": "fh5-preview-v1-source.tar.gz",
-    "sha256": "379d856f490726cefd532e38d1685a0813a51750f83e8e0b56875bc9bd50047a"
+    "sha256": "8acca40086c5d0852bb7a2e7ee87941dce1a3b768430bf63c919e5c477e18fc0"
   }
 }

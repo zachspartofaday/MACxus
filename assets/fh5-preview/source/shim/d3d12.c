@@ -59,6 +59,12 @@
 static HMODULE real_dll;
 static HINSTANCE self;
 static int dbg, idle;
+static int shim_debug_level(void)
+{
+    char value[8];
+    DWORD length = GetEnvironmentVariableA("HB_TSSHIM_DEBUG", value, sizeof value);
+    return length == 1 && (value[0] == '1' || value[0] == '2') ? value[0] - '0' : 0;
+}
 static int timestamp_only;
 static int gpu_failure_on;
 static LONG gpu_call_counts[32];
@@ -792,8 +798,8 @@ static BOOL rewrite_stream(const D3D12_PIPELINE_STATE_STREAM_DESC *in, D3D12_PIP
         else if (type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS) formats_at = at;
         else if (type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL || type == 21 || type == 26) depth_at = at;   // DEPTH_STENCIL, 1, 2
         else if (type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER || type == 27 || type == 28) { raster_at = at; raster_type = type; }
-        if (dbg && type >= D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS && type <= D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS
-            && type != D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS && type != 7 + 16 && type < 26)
+        if (dbg && ((type >= D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS && type <= D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS)
+                    || type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS || type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS))
         {
             D3D12_SHADER_BYTECODE b; UINT slot = type <= 5 ? type - 1 : type - 18;   // VS..GS -> 0..4, AS MS -> 6 7
             memcpy(&b, s + at, sizeof b);
@@ -1270,7 +1276,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
         { char v[8]; fh5_blend_usage=append_only&&gpu_failure_on&&GetEnvironmentVariableA("MACXUS_FH5_BLEND_USAGE",v,sizeof v)==1&&v[0]=='1'; }
         { char v[8]; fh5_render_audit=fh5_blend_usage&&GetEnvironmentVariableA("MACXUS_FH5_RENDER_AUDIT",v,sizeof v)==1&&v[0]=='1'; }
         // HB_TSSHIM_DEBUG=1: pipelines and feature queries; 2: also every resource and view (hundreds of MB, slow)
-        { char v[8]; DWORD n = GetEnvironmentVariableA("HB_TSSHIM_DEBUG", v, sizeof v); dbg = n ? (n < sizeof v && v[0] == '2' ? 2 : 1) : 0; }
+        dbg = shim_debug_level();
         { char v[8]; idle = GetEnvironmentVariableA("HB_D3D12_TSSHIM", v, sizeof v) == 1 && v[0] == '0'; }   // kill switch
         { char v[8]; pass_depth_resolve = GetEnvironmentVariableA("HB_TSSHIM_DEPTHRESOLVE", v, sizeof v) == 1 && v[0] == '1'; }
         { char v[8]; claim_atomic64 = GetEnvironmentVariableA("HB_TSSHIM_ATOMIC64", v, sizeof v) == 1 && v[0] == '1'; }

@@ -30,7 +30,7 @@ def main():
         system=prefix/'drive_c/windows/system32'
         for name in ['xgameruntime.dll','windows.web.dll']:
             temporary=system/(name+'.pack');shutil.copyfile(build/'payload'/name,temporary);temporary.replace(system/name)
-        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','store-addons']:
+        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','store-addons']:
             run(name,[wine,build/'probes'/(name+'.exe')])
         for name in ['metal4-counter-probe','metal4-state-probe','metal4-order-probe','metal4-lifetime-probe']:
             # State/order probes exercise the injected bridge, not raw Metal.

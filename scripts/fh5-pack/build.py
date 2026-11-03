@@ -190,8 +190,8 @@ def main():
         if raw[64:80]==b'Wine builtin DLL':raw[64:80]=bytes(16);file.write_bytes(raw)
     receipt={'schema':1,'id':'fh5-preview-v1','sourceLockSHA256':sha(PACK/'source.lock.json'),'runtimeSourceLockSHA256':lock['runtimeSourceLockSHA256'],'toolchain':toolchain,'files':{p.name:sha(p) for p in payload.iterdir()},'compiledRuntimeCFiles':compiled,'gameValidation':'pending portable-pack game trial','gameCodeIncluded':False,'vendorBinariesIncluded':False}
     probes=output/'probes';probes.mkdir()
-    for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime']:
-        helpers=[PACK/'source/shim'/file for file in ['dxil_shadingrate.c','inspect.c']] if name in ['input-layout-contracts','unused-blend-contracts','io-lifetime'] else []
+    for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts']:
+        helpers=[PACK/'source/shim'/file for file in ['dxil_shadingrate.c','inspect.c']] if name in ['input-layout-contracts','unused-blend-contracts','io-lifetime','stream-debug-contracts'] else []
         execute(common+[PACK/'source/tests'/(name+'.c'),*helpers,'-o',probes/(name+'.exe'),'-lws2_32','-lbcrypt'],REPO,env=env)
     sdk_source=args.sdk_source.resolve();sdk_build=args.sdk_build.resolve()
     execute([sdk_build/'tools/winegcc/winegcc','-b','x86_64-w64-mingw32','--wine-objdir',sdk_build,'-D__WINESRC__','-D_UCRT','-DLIBXML_STATIC','-O2','-Wall',
