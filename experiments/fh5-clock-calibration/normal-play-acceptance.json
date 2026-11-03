@@ -15,7 +15,7 @@
     "at": "2026-11-03T12:24:28.488077+00:00",
     "answer": "Driving/benchmark works; latency is plausible",
     "entryPoint": "Latest normal MACxus Play run",
-    "numericLatency": "not supplied for packaged run"
+    "numericLatency": "35 ms, supplied in follow-up"
   },
   "packagedChecks": {
     "sixModuleHashesVerified": true,
@@ -24,7 +24,8 @@
     "NVIDIACompatibilityIdentityDLSSAndHUDRetained": true,
     "drivingAndBenchmark": "User confirmed working",
     "latencyDisplay": "User confirmed plausible",
-    "numericLatency": "Not supplied"
+    "numericLatency": "35 ms",
+    "averageLatencyMilliseconds": 35
   },
   "separatePrivateTrial": {
     "averageLatencyDisplayed": 61.1,
@@ -37,6 +38,7 @@
     "No new FPS or frame-generation correctness acceptance",
     "Actual host sleep/resume and long-session drift untested",
     "No new multiplayer test claimed for calibrated packaged run; baseline multiplayer acceptance retained separately",
-    "Black-road investigation excluded"
+    "Black-road investigation excluded",
+    "35 ms packaged and 61.1 private results are different runs, not a controlled performance comparison"
   ]
 }
