@@ -208,7 +208,7 @@ export async function prepareGameCompatibilityPack(request: CompatibilityPackReq
  * Missing paths are allowed for first boot; existing setup destinations must
  * stay inside this bottle. Normal Wine drive/user-document links are not
  * recursively traversed. This is not isolation from concurrent external edits. */
-async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string, manifest: Manifest): Promise<void> {
+export async function validateCompatibilityPrefix(prefix: string, bottlesRoot: string, manifest: Pick<Manifest, 'configuration'>): Promise<void> {
   const directories = async (root: string, relative: string): Promise<boolean> => {
     let current = root;
     for (const part of ['', ...relative.split('/').filter(Boolean)]) {
