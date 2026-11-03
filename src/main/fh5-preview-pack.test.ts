@@ -90,10 +90,19 @@ it('uses Preview IDs with MetalFX on and the accepted fallback off, clearing inh
     await fs.chmod(native, 0o755);
     await fs.mkdir(path.join(engine.root, 'bin'), { recursive: true });
     await fs.writeFile(path.join(engine.root, 'bin/wineserver'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    // This fixture exercises shell environment selection, not native loading.
+    // Hosted macOS can honor DYLD injection even for these shell stand-ins;
+    // the fixture's text payload is deliberately not a compiled Mach-O dylib.
+    // Keep the actual generated wrapper intact and disable only injection in
+    // this test copy. The full wrapper/injection path has separate real probes.
+    const script = await fs.readFile(pack.runner.launchCommand!, 'utf8');
+    expect(script.match(/^export DYLD_INSERT_LIBRARIES=.*$/gm)).toHaveLength(1);
+    const environmentOnly = path.join(path.dirname(pack.runner.launchCommand!), 'identity-environment-only');
+    await fs.writeFile(environmentOnly, script.replace(/^export DYLD_INSERT_LIBRARIES=.*\n/m, ''), { mode: 0o755 });
     for (const [flag, expected] of [['1', 'unset|unset'], ['0', '0x10de|0x2786'], [undefined, '0x10de|0x2786']]) {
-      const env = { ...process.env, D3DM_VENDOR_ID: 'foreign-vendor', D3DM_DEVICE_ID: 'foreign-device', D3DM_DEVICE_DESCRIPTION: 'foreign-name' };
+      const env = { ...process.env, DYLD_INSERT_LIBRARIES: '', D3DM_VENDOR_ID: 'foreign-vendor', D3DM_DEVICE_ID: 'foreign-device', D3DM_DEVICE_DESCRIPTION: 'foreign-name' };
       if (flag === undefined) delete env.D3DM_ENABLE_METALFX; else env.D3DM_ENABLE_METALFX = flag;
-      expect(execFileSync(pack.runner.launchCommand!, [], { env, encoding: 'utf8' })).toBe(`${expected}|Apple M5 Max (D3DMetal)`);
+      expect(execFileSync(environmentOnly, [], { env, encoding: 'utf8' })).toBe(`${expected}|Apple M5 Max (D3DMetal)`);
     }
   } finally { await fs.rm(f.root, { recursive: true, force: true }); }
 });
