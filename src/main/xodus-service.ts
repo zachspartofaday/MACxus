@@ -27,7 +27,9 @@ export async function startXodusBridge(socketPath: string, discovery?: AddonDisc
   const key = randomBytes(32).toString('hex');
   const expected = Buffer.from(key, 'ascii');
   const clients = new Set<Socket>();
+  const queries = new Set<Promise<void>>();
   const stopped = new AbortController();
+  let stopping: Promise<void> | undefined;
   const server: Server = createServer((client) => {
     clients.add(client);
     client.once('close', () => clients.delete(client));
@@ -75,13 +77,14 @@ export async function startXodusBridge(socketPath: string, discovery?: AddonDisc
         const cancelled = new AbortController();
         client.once('close', () => cancelled.abort());
         const signal = AbortSignal.any([cancelled.signal, stopped.signal]);
-        void discovery(frame.subarray(8), signal).then(payload => {
+        const query = Promise.resolve().then(() => discovery(frame.subarray(8), signal)).then(payload => {
           if (signal.aborted || client.destroyed) return;
           if (!payload.length || payload.length > 60_000) { client.destroy(); return; }
           const header = Buffer.alloc(8);
           header.writeUInt32LE(0x58445358); header.writeUInt16LE(STORE_ADDON_DISCOVERY_RESPONSE, 4); header.writeUInt16LE(payload.length, 6);
           client.end(Buffer.concat([header, payload]));
-        }).catch(() => client.destroy());
+        }).catch(() => { client.destroy(); }).finally(() => { queries.delete(query); });
+        queries.add(query);
       };
       client.on('data', collect);
       collect(Buffer.alloc(0));
@@ -98,11 +101,14 @@ export async function startXodusBridge(socketPath: string, discovery?: AddonDisc
   return {
     port: address.port,
     key,
-    stop: async () => {
+    stop: () => stopping ??= (async () => {
       stopped.abort();
       for (const socket of clients) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
-    },
+      // Discovery may still be reaping its account helper after cancellation.
+      // Do not end the session or release its resources before that completes.
+      await Promise.allSettled([...queries]);
+    })(),
   };
 }
 

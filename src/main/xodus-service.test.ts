@@ -116,3 +116,29 @@ it('does not invoke discovery before authentication and aborts an active query o
   client.write(Buffer.concat([Buffer.from(bridge.key), header, Buffer.from('x')])); await started;
   await bridge.stop(); expect(aborted).toBe(true); client.destroy();
 });
+
+it('keeps shutdown pending until cancelled discovery cleanup completes, including concurrent stops', async () => {
+  let began!: () => void, cancelled!: () => void, releaseCleanup!: () => void;
+  const started = new Promise<void>(resolve => { began = resolve; });
+  const aborted = new Promise<void>(resolve => { cancelled = resolve; });
+  const cleanup = new Promise<void>(resolve => { releaseCleanup = resolve; });
+  const bridge = await startXodusBridge('/unused.sock', async (_, signal) => {
+    began();
+    if (!signal.aborted) await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }));
+    cancelled(); await cleanup;
+    return Buffer.from('cancelled');
+  });
+  const header = Buffer.alloc(8); header.writeUInt32LE(0x58445358); header.writeUInt16LE(0x7f01, 4); header.writeUInt16LE(1, 6);
+  const client = createConnection(bridge.port, '127.0.0.1');
+  try {
+    await once(client, 'connect');
+    client.write(Buffer.concat([Buffer.from(bridge.key), header, Buffer.from('x')])); await started;
+    let finished = false;
+    const stopping = bridge.stop(); expect(bridge.stop()).toBe(stopping);
+    void stopping.then(() => { finished = true; });
+    await aborted; await new Promise<void>(resolve => setImmediate(resolve));
+    expect(finished).toBe(false);
+    releaseCleanup(); await stopping; expect(finished).toBe(true);
+    await bridge.stop();
+  } finally { releaseCleanup(); client.destroy(); await bridge.stop(); }
+});
