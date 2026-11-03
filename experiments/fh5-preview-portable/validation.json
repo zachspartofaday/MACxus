@@ -108,10 +108,8 @@
     "failed": 0
   },
   "typecheck": "passed",
-  "gameLaunched": false,
-  "accountUsed": false,
-  "livePortablePackAcceptance": "pending",
-  "freshIndependentSolReview": "F1 recheck found remaining builder manifest read; fixed same descriptor fallback and tested both stubbed main suffix and REAL full compile from extracted archive; fresh recheck pending",
+  "livePortablePackAcceptance": "Normal Play, visible Store/DLC discovery and actual online session/multiplayer confirmed by user; marketplace purchase detail action errors. See normal-play-acceptance.json.",
+  "freshIndependentSolReview": "Exact 609375a recheck found no issues; prior source-release F1 closed. Five Python contracts, three distribution tests, typecheck and archive/source/payload pins independently checked; real full compilation inspected, not rerun.",
   "knownLimits": [
     "Black-road investigation intentionally excluded",
     "Clock calibration still E_NOTIMPL; latency unresolved",
@@ -155,5 +153,7 @@
       "gameLaunched": false,
       "accountUsed": false
     }
-  }
+  },
+  "offlineValidationGameLaunched": false,
+  "offlineValidationAccountUsed": false
 }
