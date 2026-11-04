@@ -11,7 +11,7 @@ import type { ProtonRunner } from './proton.js';
 export const FH5_STORE_ID = '9NNX1VVR3KNQ';
 const assetRoot = fileURLToPath(new URL('../../assets/fh5-preview', import.meta.url));
 const payloadNames = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
-const engineNames = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
+const engineNames = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll', 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
 const digest = (data: Buffer) => createHash('sha256').update(data).digest('hex');
 interface Manifest {
   schema: 1; id: 'fh5-preview-v1'; storeId: string; version: string; buildTag: string;
@@ -183,7 +183,7 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
     MACXUS_GPU_QUERY_COOKIE: randomBytes(8).toString('hex'),
     D3DM_MTL4: '1', MACXUS_PROCESS_OBSERVER: '1', MACXUS_TIMESTAMP_ONLY: '1', MACXUS_APPEND_ONLY: '1', MACXUS_FH5_UNUSED_BLEND: '1',
     MACXUS_GPU_CLOCK_CALIBRATION: '1',
-    MACXUS_FH5_DESCRIPTOR_DATA: '1', MACXUS_DUAL_UDP_TTL: '1', MACXUS_COMMIT_ACCOUNTING: '1', HB_TSSHIM_DEBUG: '0',
+    MACXUS_FH5_DESCRIPTOR_DATA: '1', MACXUS_DUAL_UDP_TTL: '1', MACXUS_COMMIT_ACCOUNTING: '1', MACXUS_FH5_NVAPI_PROFILE: '1', HB_TSSHIM_DEBUG: '0',
     D3DM_DEVICE_DESCRIPTION: `${host.chip} (D3DMetal)`,
     HB_D3D12_REAL: 'Z:' + path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll').replaceAll('/', '\\'),
     XODUS_CONTENT_PACKAGE_ROOT: 'Z:' + path.resolve(request.gameRoot).replaceAll('/', '\\'),

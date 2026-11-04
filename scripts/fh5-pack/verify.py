@@ -43,7 +43,7 @@ def main():
         system=prefix/'drive_c/windows/system32'
         for name in ['xgameruntime.dll','windows.web.dll','macxus-clock.dll']:
             temporary=system/(name+'.pack');shutil.copyfile(build/'payload'/name,temporary);temporary.replace(system/name)
-        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','store-addons']:
+        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','nvapi-profile','store-addons']:
             run(name,[wine,build/'probes'/(name+'.exe')])
         # The unmodified vendor loader correctly refuses native injection. This
         # control accepts failure semantics only; enabled PE/native calibration

@@ -13,7 +13,7 @@ async function fixture() {
   await fs.mkdir(path.join(assets, 'payload'), { recursive: true });
   const source = Buffer.from('source lock fixture'), entitlements = Buffer.from('entitlements fixture');
   await fs.writeFile(path.join(assets, 'source.lock.json'), source); await fs.writeFile(path.join(assets, 'loader-entitlements.plist'), entitlements);
-  const engineFiles = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
+  const engineFiles = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll', 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
   const files = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
   for (const name of engineFiles) { await fs.mkdir(path.dirname(path.join(engine, name)), { recursive: true }); await fs.writeFile(path.join(engine, name), 'vendor ' + name); }
   await fs.mkdir(path.join(engine, 'etc')); await fs.writeFile(path.join(engine, 'etc/CrossOver.conf'), '"BuildTag" = "cxpreview-20261015-rc1"\n');
@@ -63,6 +63,7 @@ it('prepares a relocated private engine/bottle without modifying a hard-linked v
     const script = await fs.readFile(pack.runner.launchCommand!, 'utf8');
     expect(script).toContain('D3DM_MTL4='); expect(script).toContain('DYLD_INSERT_LIBRARIES='); expect(script).toContain('MACXUS_FH5_DESCRIPTOR_DATA=');
     expect(script).toContain("MACXUS_GPU_CLOCK_CALIBRATION='1'"); expect(script).toContain('macxus-clock=b');
+    expect(script).toContain("MACXUS_FH5_NVAPI_PROFILE='1'");
     expect(script).toContain("D3DM_DEVICE_DESCRIPTION='Apple M5 Max (D3DMetal)'");
     expect(script).toContain('unset D3DM_VENDOR_ID D3DM_DEVICE_ID');
     expect(script).not.toContain('NVIDIA GeForce RTX 4070');

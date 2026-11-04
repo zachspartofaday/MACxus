@@ -217,6 +217,7 @@ static int WSAAPI observer_getaddrinfo(PCSTR node,PCSTR service,const ADDRINFOA 
 
 #include "io_failure_observer.h"
 #include "fh5_descriptor_data.h"
+#include "nvapi_profile.h"
 
 struct observer_hook {const char *name;unsigned ordinal,api;void *hook;void **original;BOOL socket;};
 #define OBS_ENTRY(name,ord,api,func,real,net) {name,ord,api,(void*)func,(void**)&real,net}
@@ -246,7 +247,8 @@ static struct observer_hook observer_hooks[]={
  OBS_ENTRY("CreateEventW",0,29,observer_event_w,observer_real_event_w,FALSE),
  OBS_ENTRY("CreateEventA",0,29,observer_event_a,observer_real_event_a,FALSE),
  OBS_ENTRY("CreateThread",0,30,observer_create_thread,observer_real_create_thread,FALSE),
- OBS_ENTRY("memset",0,31,fh5_data_memset,fh5_data_real_memset,FALSE)
+ OBS_ENTRY("memset",0,31,fh5_data_memset,fh5_data_real_memset,FALSE),
+ OBS_ENTRY("GetProcAddress",0,33,fh5_nvapi_getproc,fh5_nvapi_real_getproc,FALSE)
 };
 static BOOL observer_image_range(SIZE_T image,SIZE_T rva,SIZE_T size){return rva<image && size<=image-rva;}
 static BOOL observer_image_string(const BYTE *base,SIZE_T image,SIZE_T rva)
@@ -271,6 +273,7 @@ static void process_observer_install(void)
     observer_commit_enabled=GetEnvironmentVariableA("MACXUS_COMMIT_ACCOUNTING",enabled,sizeof enabled)==1 && enabled[0]=='1';
     observer_udp_ttl_enabled=GetEnvironmentVariableA("MACXUS_DUAL_UDP_TTL",enabled,sizeof enabled)==1 && enabled[0]=='1';
     observer_async_io_enabled=GetEnvironmentVariableA("MACXUS_ASYNC_IO_OBSERVER",enabled,sizeof enabled)==1 && enabled[0]=='1';
+    fh5_nvapi_configure();
     BYTE *base=(BYTE*)GetModuleHandleW(NULL);IMAGE_DOS_HEADER *dos=(IMAGE_DOS_HEADER*)base;
     if(!base || dos->e_magic!=IMAGE_DOS_SIGNATURE || dos->e_lfanew<0 || dos->e_lfanew>1048576)goto done;
     IMAGE_NT_HEADERS64 *nt=(IMAGE_NT_HEADERS64*)(base+dos->e_lfanew);
@@ -295,7 +298,7 @@ static void process_observer_install(void)
             if(!ordinal){SIZE_T rva=(SIZE_T)thunk->u1.AddressOfData;if(!observer_image_range(image,rva,3) || !observer_image_string(base,image,rva+2))continue;name=(const char*)base+rva+2;}
             for(unsigned i=0;i<sizeof(observer_hooks)/sizeof(observer_hooks[0]);i++){
                 struct observer_hook *h=observer_hooks+i;
-                if(h->api==31 ? !fh5_data_enabled : h->api>=26 && !observer_async_io_enabled)continue;
+                if(h->api==33 ? !fh5_nvapi_enabled : h->api==31 ? !fh5_data_enabled : h->api>=26 && !observer_async_io_enabled)continue;
                 if(h->socket!=net || (ordinal ? !h->ordinal || h->ordinal!=ordinal : strcmp(h->name,name)))continue;
                 installed+=observer_patch_slot((void**)(base+target),h);break;
             }

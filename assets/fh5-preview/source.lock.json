@@ -26,7 +26,7 @@
     "source/shim/inspect.h": "1ba20950fcc88f126b453e9c4b82e78d77513fd21242abb786ff2db744073995",
     "source/shim/io_callback_slots.inc": "066eb2f8e361bf342ca83f798dfc08b0a1396a68f9dfc232d2c26e712fac46fa",
     "source/shim/io_failure_observer.h": "14a6bd7c79f18c39ea75c73189417c295a4af8e6be536822df5fa24e14226148",
-    "source/shim/process_observer.h": "49cff5b486db7c0757e52ed5f44e571babf50fce379ea39ad575d461dd9c8097",
+    "source/shim/process_observer.h": "938c979729c790964580289267c84d03d10dd77f73a9359d66d668fa5c2e6d3b",
     "source/shim/render_audit_log.h": "489c3c84b7fc2450f506e0212257b56638521c2ac4d86662dfa9b8fb7e231eac",
     "source/shim/render_layout_metadata.h": "0fc6af67fdb8b7a388d8f4f4eb8260ba9d059c75647ba36ac036a2945d32a673",
     "source/shim/shader_keywords.h": "47e2bd7b9d5dcae3cc42c7ef91c2290427c01a077bec60f11fe4179ef27011c4",
@@ -59,7 +59,9 @@
     "source/clock/clock-abi.h": "22d357732970f78a6145ee8fb5b49ccd0b6c0c7eb423134a72a9c3d565c3f038",
     "source/clock/clock-pe.c": "f5db4233e863c822211e078b23e8e0a92bebb2d729e30caf5c7d91664184166d",
     "source/clock/native-probe.m": "01b84f6b9e5491c926cd590913895b37447105fa60ba33102316ebf6f72fbd94",
-    "source/shim/clock-hook.h": "763d29d9bbca729e5bc5167820f982e99f59bbe1607352d5ecd80c308c1a4118"
+    "source/shim/clock-hook.h": "763d29d9bbca729e5bc5167820f982e99f59bbe1607352d5ecd80c308c1a4118",
+    "source/shim/nvapi_profile.h": "4e38368feef3507e1924b7968eaf63168732e0682d7269a0f7538510fa290df5",
+    "source/tests/nvapi-profile.c": "6427b2cc2647a8ef9b883984f3323c7474932d5cdb3919fbcae3ea945d234d2c"
   },
   "runtimeTargetSHA256": {
     "dlls/xgameruntime/LICENSE": "e237fa56668030e928551ddd60f05df5fe957f75eab874bbd017e085ed722e7c",

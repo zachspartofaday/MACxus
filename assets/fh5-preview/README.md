@@ -41,6 +41,17 @@ uninstall script or modification of the original game/application.
   ticks; absolute CPU samples are mapped into Preview's continuous 10 MHz QPC
   domain on each call and checked against guest QPC brackets. Missing support,
   sleep transitions or invalid pairs fail without replacing caller outputs.
+- FH5 opts into a default-profile fallback for the pinned Preview NVAPI provider.
+  When its current-global-profile getter is absent, the adapter delegates that
+  lookup to the provider's existing base-profile getter. Native implementations
+  take precedence; missing base support and native errors remain failures. This
+  is an explicit policy for this compatibility pack, not an assertion that base
+  and current-global profiles are equivalent on arbitrary NVIDIA drivers. No
+  settings are written, profile handles remain provider-owned, and driver
+  versions are obtained from the native API. The isolated full GPU/calibration
+  trial reached the benchmark without the startup dialog and displayed `576.2`
+  with DLAA/frame generation retained; the integrated pack still needs normal
+  Play validation for this addition. No version number or dialog is overridden.
 - Explicit input-layout offsets; the tested
   absent-render-target blend adjustment; guest committed-memory accounting and
   dual-stack UDP TTL handling. Normal diagnostic observers remain off.
