@@ -30,8 +30,10 @@ and performance acceptance. The full prototype was reconstructed with all three
 patches and tested separately; `prototype-acceptance.json` records that scope.
 
 `validation.json` records the production payload/source reproduction, synthetic
-contracts and GPU/calibration checks. Normal MACxus Play and fresh Sol review
-remain pending for this candidate. Default/base-profile fallback is a deliberate
+contracts and GPU/calibration checks. Normal MACxus Play remains pending. Fresh Sol review of the functional
+candidate `105216a` found no actionable findings; the combined private benchmark
+completed without a startup dialog. The follow-up evidence is recorded in
+`../fh5-compat-followups/game-acceptance.json`. Default/base-profile fallback is a deliberate
 FH5 policy for this provider, not a universal assertion about NVIDIA profiles.
 Black roads, unrelated vendor APIs, sleep/resume and universal Steam acceptance
 are outside this change. The test binary is built from

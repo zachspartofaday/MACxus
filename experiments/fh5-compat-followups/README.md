@@ -40,7 +40,8 @@ A snapshot produced by the actual helper loads database 27 with zero database
 errors. A deliberately corrupted signature produces native `invalid signature`
 errors and does not load database 27. Signature enforcement is retained.
 No assertion is made that this particular signed cache contains an FH5 rule;
-real FH5 rule-selection traces remain pending.
+the game trace now shows FH5 database lookups, but a specific matching rule is
+still not established.
 
 ## Existing heap import
 
@@ -51,8 +52,11 @@ no address contents or raw pointers are recorded. Normal Play leaves it off.
 
 A real D3DMetal control returns `0x80004001` (`E_NOTIMPL`) for address import,
 then successfully creates a normal 64 KiB upload heap. This proves the tracing
-and ordinary allocation path, not FH5's fallback behavior. One combined game
-trial is still needed to attribute FH5's single call and subsequent recovery.
+and ordinary allocation path, not FH5's fallback behavior. The combined private game trial completed a benchmark without the startup
+dialog. Two observed initializations each made five imports from the same caller
+RVA, all returning `E_NOTIMPL`, followed by successful ordinary allocations.
+The exact fallback branch is not proven; this trace shows that the unsupported
+operation is tolerated in this benchmark, so no fake implementation was added.
 
 ## Validation and limits
 
@@ -63,6 +67,8 @@ pairs, linked/oversized files, damaged snapshots and NVAPI setup destinations.
 
 Local evidence remains under `work/fh5-followup-audit` and
 `work/fh5-followup-production`; raw logs, vendor data, prefixes and vendor
-binaries are not published. Fresh Sol review, combined game acceptance and
-integrated normal Play remain pending. No performance improvement, universal
+binaries are not published. Fresh Sol review of the exact functional candidate found no actionable
+findings, and the user completed the combined private benchmark without a
+startup dialog. `game-acceptance.json` records the bounded evidence. Integrated
+normal Play remains pending. No performance improvement, universal
 Windows parity, or restored FH5 title-specific vendor rule is claimed.
