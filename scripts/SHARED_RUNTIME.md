@@ -412,7 +412,55 @@ so a missing base does not lose the clean build. Default publication is off;
 verification does not claim that a remote GitHub Actions run has succeeded.
 
 
+### Shared endpoint matching and XSTS refusals
+
+`xgameruntime-endpoint-wildcards.patch` fixes wildcard matching in the shared
+endpoint lookup used by both explicit-MSA and legacy Windows title identities.
+Catch-all and trailing `*` patterns consume the remaining hostname, matching
+can backtrack after reaching the end of a pattern, and DNS host comparisons are
+case-insensitive. Exact-host, path-specific, title-list precedence and WebSocket
+upgrade rules remain covered by the endpoint probe. The runtime uses the
+matched service's supplied audience and policy; no game-specific audience is
+added. Existing fallback behavior for genuinely unmatched URLs is retained.
+
+On XSTS refusal the normal error log additionally records whether a bounded
+numeric `XErr` is present, its value, and whether a title token was included.
+An authorization failure during a token request also records whether endpoint
+metadata matched or the existing fallback was used. No response message,
+redirect URL, token or account identity is added to these diagnostics. Missing,
+malformed, fractional or out-of-range `XErr` values are ignored, and responses
+larger than 16 KiB are not parsed for diagnostics. A silent scanner accepts only
+flat UTF-8 objects with unescaped keys, a canonical unsigned-integer `XErr`, and
+string/unsigned-integer/boolean/null values for other fields. Nested values,
+escaped keys and other unsupported shapes produce no error-code metadata.
+The scanner makes no calls to Wine's JSON parser, whose own tracing includes
+its complete input. The refusal-only probe checks complete stdout/stderr with
+`trace+web` enabled and fails if captured output is truncated. A refusal stays a failure;
+there is no audience substitution or automatic removal of a title claim.
+
+The endpoint and privilege probes compile the production helpers using
+synthetic hosts, identities and transport. These are offline regressions, not
+proof that 007 First Light or any other title can connect online. See
+[`experiments/xsts-endpoint-routing/README.md`](../experiments/xsts-endpoint-routing/README.md)
+for the comparison and remaining live-test requirements.
+
 ### Legacy Windows title authentication and endpoint policies
+
+`xgameruntime-empty-token-result.patch` keeps token-result storage usable when a
+matched endpoint requires no authorization token. UTF-8 and UTF-16 results then
+contain an owned empty string with its terminator included in the size/count.
+Optional signature storage follows it within the caller's result buffer; a
+signature policy is still applied when present. No authorization request is made
+for a rule with no token type, and failed authorization still returns failure.
+Optional numeric metadata distinguishes authenticated and no-token routes.
+
+The token ABI probe covers both encodings with and without a signature policy,
+buffer ownership and bounds, distinct string storage, termination, preserved
+signatures, and absence of an authorization call for no-token rules. The private
+007 comparison using this change and the wildcard fix completed Xbox token
+requests successfully and continued running, but still failed the game's
+configuration fetch. The original crash's cause and complete online acceptance
+remain unproven; this does not claim Windows-wide or all-title compatibility.
 
 The development lock includes `xgameruntime-windows-title-auth.patch`. For legacy
 Windows packages with a TitleId and no MSAAppId, title authentication uses the
