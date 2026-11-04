@@ -63,6 +63,9 @@ it('prepares a relocated private engine/bottle without modifying a hard-linked v
     const script = await fs.readFile(pack.runner.launchCommand!, 'utf8');
     expect(script).toContain('D3DM_MTL4='); expect(script).toContain('DYLD_INSERT_LIBRARIES='); expect(script).toContain('MACXUS_FH5_DESCRIPTOR_DATA=');
     expect(script).toContain("MACXUS_GPU_CLOCK_CALIBRATION='1'"); expect(script).toContain('macxus-clock=b');
+    expect(script).toContain("D3DM_DEVICE_DESCRIPTION='Apple M5 Max (D3DMetal)'");
+    expect(script).toContain('unset D3DM_VENDOR_ID D3DM_DEVICE_ID');
+    expect(script).not.toContain('NVIDIA GeForce RTX 4070');
     expect(script).not.toContain('.asar/'); expect(script).not.toContain('/Applications/'); expect(script).not.toContain('XODUS_BRIDGE_KEY'); expect(script).not.toContain('XODUS_BRIDGE_PORT');
     execFileSync('/bin/sh', ['-n', pack.runner.launchCommand!]);
     expect(await fs.readFile(path.join(f.engine, 'lib/wine/x86_64-unix/wine'), 'utf8')).toBe('vendor lib/wine/x86_64-unix/wine');
@@ -75,6 +78,32 @@ it('prepares a relocated private engine/bottle without modifying a hard-linked v
     const before = f.execute.mock.calls.length;
     await prepareFH5PreviewPack(f.request, f.deps);
     expect(f.execute.mock.calls.slice(before).some(([tool]) => tool.endsWith('/ditto'))).toBe(false);
+  } finally { await fs.rm(f.root, { recursive: true, force: true }); }
+});
+it('uses Preview IDs with MetalFX on and the accepted fallback off, clearing inherited identity values', async () => {
+  const f = await fixture();
+  try {
+    const pack = (await prepareFH5PreviewPack(f.request, f.deps))!;
+    const engine = f.prepare.mock.calls[0][0] as { root: string };
+    const native = path.join(engine.root, 'lib/wine/x86_64-unix/wine');
+    await fs.writeFile(native, '#!/bin/sh\nprintf "%s|%s|%s" "${D3DM_VENDOR_ID-unset}" "${D3DM_DEVICE_ID-unset}" "$D3DM_DEVICE_DESCRIPTION"\n', { mode: 0o755 });
+    await fs.chmod(native, 0o755);
+    await fs.mkdir(path.join(engine.root, 'bin'), { recursive: true });
+    await fs.writeFile(path.join(engine.root, 'bin/wineserver'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    // This fixture exercises shell environment selection, not native loading.
+    // Hosted macOS can honor DYLD injection even for these shell stand-ins;
+    // the fixture's text payload is deliberately not a compiled Mach-O dylib.
+    // Keep the actual generated wrapper intact and disable only injection in
+    // this test copy. The full wrapper/injection path has separate real probes.
+    const script = await fs.readFile(pack.runner.launchCommand!, 'utf8');
+    expect(script.match(/^export DYLD_INSERT_LIBRARIES=.*$/gm)).toHaveLength(1);
+    const environmentOnly = path.join(path.dirname(pack.runner.launchCommand!), 'identity-environment-only');
+    await fs.writeFile(environmentOnly, script.replace(/^export DYLD_INSERT_LIBRARIES=.*\n/m, ''), { mode: 0o755 });
+    for (const [flag, expected] of [['1', 'unset|unset'], ['0', '0x10de|0x2786'], [undefined, '0x10de|0x2786']]) {
+      const env = { ...process.env, DYLD_INSERT_LIBRARIES: '', D3DM_VENDOR_ID: 'foreign-vendor', D3DM_DEVICE_ID: 'foreign-device', D3DM_DEVICE_DESCRIPTION: 'foreign-name' };
+      if (flag === undefined) delete env.D3DM_ENABLE_METALFX; else env.D3DM_ENABLE_METALFX = flag;
+      expect(execFileSync(environmentOnly, [], { env, encoding: 'utf8' })).toBe(`${expected}|Apple M5 Max (D3DMetal)`);
+    }
   } finally { await fs.rm(f.root, { recursive: true, force: true }); }
 });
 it('refuses linked calibration module caches without writing outside the pack', async () => {
