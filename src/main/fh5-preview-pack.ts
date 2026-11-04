@@ -5,7 +5,7 @@ import { release, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { shellQuote, type CrossOverInstall, type RuntimeDllSource } from './crossover.js';
 import { run, type RunResult } from './process.js';
-import { validateCompatibilityPrefix } from './game-compatibility-pack.js';
+import { validateCompatibilityPrefix } from './compatibility-prefix.js';
 import type { ProtonRunner } from './proton.js';
 import { prepareFH5CompatHome } from './fh5-compat-home.js';
 
@@ -161,7 +161,7 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
   const bottles = await directory(root, 'bottles');
   // Validate any existing setup paths before the vendor runner can update them.
   const prefix = path.join(bottles, 'xbox');
-  await validateCompatibilityPrefix(prefix, bottles, { configuration: [] });
+  await validateCompatibilityPrefix(prefix, bottles);
   const nvapiTarget = path.join(prefix, 'drive_c/windows/system32/nvapi64.dll');
   const validateNvapiTarget = async () => {
     for (const file of [nvapiTarget, nvapiTarget + '.fh5-' + process.pid]) {
@@ -174,7 +174,7 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
   await validateNvapiTarget();
   const runner = await deps.prepare(engine, bottles, request.runtime, request.log, 'win64');
   if (path.resolve(runner.compatibilityDataPath) !== prefix) throw Error('FH5 requires its dedicated bottle.');
-  await validateCompatibilityPrefix(prefix, bottles, { configuration: [] });
+  await validateCompatibilityPrefix(prefix, bottles);
   await validateNvapiTarget();
   await plainDirectory(prefix, 'drive_c', 'windows', 'system32');
   // Wine normally installs a tiny builtin placeholder. Materialize the verified
