@@ -16,11 +16,15 @@ async function fixture() {
   const engineFiles = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll', 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
   const files = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
   for (const name of engineFiles) { await fs.mkdir(path.dirname(path.join(engine, name)), { recursive: true }); await fs.writeFile(path.join(engine, name), 'vendor ' + name); }
+  const providerAlias = 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so';
+  const providerTarget = 'lib/apple_gptk/external/libd3dshared.dylib';
+  await fs.unlink(path.join(engine, providerAlias));
+  await fs.symlink('../../external/libd3dshared.dylib', path.join(engine, providerAlias));
   await fs.mkdir(path.join(engine, 'etc')); await fs.writeFile(path.join(engine, 'etc/CrossOver.conf'), '"BuildTag" = "cxpreview-20261015-rc1"\n');
   for (const name of files) await fs.writeFile(path.join(assets, 'payload', name), 'owned ' + name);
   const manifest = { schema: 1, id: 'fh5-preview-v1', storeId: FH5_STORE_ID, version: '20261015', buildTag: 'cxpreview-20261015-rc1',
     files: Object.fromEntries(files.map(name => [name, hash('owned ' + name)])),
-    engineFiles: Object.fromEntries(engineFiles.map(name => [name, hash('vendor ' + name)])), sourceLockSHA256: hash(source), loaderEntitlementsSHA256: hash(entitlements),
+    engineFiles: Object.fromEntries(engineFiles.map(name => [name, hash('vendor ' + (name === providerAlias ? providerTarget : name))])), sourceLockSHA256: hash(source), loaderEntitlementsSHA256: hash(entitlements),
     preparedLoaderSHA256: hash('vendor lib/wine/x86_64-unix/wine' + ' signed fixture') };
   await fs.writeFile(path.join(assets, 'manifest.json'), JSON.stringify(manifest));
   const installation = { root: engine, wine: path.join(engine, 'bin/wine'), wineserver: path.join(engine, 'bin/wineserver'), cxbottle: path.join(engine, 'bin/cxbottle'), version: '20261015' };
@@ -28,7 +32,7 @@ async function fixture() {
   const execute = vi.fn(async (tool: string, args: string[]) => {
     if (tool.endsWith('/ditto')) {
       const [from, to] = args.slice(-2);
-      await fs.cp(from, to, { recursive: true });
+      await fs.cp(from, to, { recursive: true, verbatimSymlinks: true });
       const relative = 'Contents/SharedSupport/CrossOver/lib/wine/x86_64-unix/wine';
       await fs.unlink(path.join(to, relative)); await fs.link(path.join(from, relative), path.join(to, relative));
     }
@@ -175,5 +179,34 @@ it.each(['nvapi64.dll', `nvapi64.dll.fh5-${process.pid}`])('rejects linked NVAPI
     f.prepare.mockClear();
     await expect(prepareFH5PreviewPack(f.request, f.deps)).rejects.toThrow('NVAPI setup files');
     expect(f.prepare).not.toHaveBeenCalled(); expect(await fs.readFile(outside, 'utf8')).toBe('preserve');
+  } finally { await fs.rm(f.root, { recursive: true, force: true }); }
+});
+
+it.each(['absolute-alias', 'different-relative-alias', 'linked-target-parent', 'other-engine-link', 'cached-alias'])('rejects %s even with matching provider bytes', async kind => {
+  const f = await fixture();
+  try {
+    let engine = f.engine;
+    if (kind === 'cached-alias') {
+      await prepareFH5PreviewPack(f.request, f.deps);
+      engine = (f.prepare.mock.calls[0][0] as { root: string }).root;
+      f.prepare.mockClear();
+    }
+    const alias = path.join(engine, 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so');
+    const target = path.join(engine, 'lib/apple_gptk/external/libd3dshared.dylib');
+    const outside = path.join(f.root, 'outside-provider'); await fs.copyFile(target, outside);
+    if (kind === 'absolute-alias' || kind === 'cached-alias') {
+      await fs.unlink(alias); await fs.symlink(outside, alias);
+    } else if (kind === 'different-relative-alias') {
+      const other = path.join(path.dirname(target), 'other.dylib'); await fs.copyFile(target, other);
+      await fs.unlink(alias); await fs.symlink('../../external/other.dylib', alias);
+    } else if (kind === 'linked-target-parent') {
+      const parent = path.dirname(target); await fs.rename(parent, parent + '-saved'); await fs.symlink(parent + '-saved', parent);
+    } else {
+      const file = path.join(engine, 'lib/wine/x86_64-unix/ntdll.so');
+      await fs.rename(file, file + '.saved'); await fs.symlink(file + '.saved', file);
+    }
+    await expect(prepareFH5PreviewPack(f.request, f.deps)).rejects.toThrow(/alias|plain|links|Invalid FH5 pack file/);
+    expect(f.prepare).not.toHaveBeenCalled();
+    expect(await fs.readFile(outside, 'utf8')).toBe('vendor lib/apple_gptk/external/libd3dshared.dylib');
   } finally { await fs.rm(f.root, { recursive: true, force: true }); }
 });

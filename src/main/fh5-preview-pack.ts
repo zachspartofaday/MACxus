@@ -49,10 +49,23 @@ async function directory(root: string, ...parts: string[]): Promise<string> {
 }
 async function verified(file: string, expected: string, maximum = 64 * 1024 * 1024): Promise<Buffer> {
   const stat = await fs.lstat(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maximum) throw Error('Invalid FH5 pack file.');
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maximum) throw Error(`Invalid FH5 pack file: ${path.basename(file)}.`);
   const bytes = await fs.readFile(file);
   if (digest(bytes) !== expected) throw Error(`FH5 pack checksum mismatch: ${path.basename(file)}.`);
   return bytes;
+}
+async function verifiedEngineFile(root: string, name: string, expected: string): Promise<Buffer> {
+  const file = path.join(root, name);
+  // The pinned Preview engine aliases this Unix provider to its shared bridge.
+  // Accept only its exact relative target, with plain in-engine parent paths
+  // and the same content hash. Other engine files and pack payloads stay plain.
+  if (name === 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so' && (await fs.lstat(file)).isSymbolicLink()) {
+    if (await fs.readlink(file) !== '../../external/libd3dshared.dylib') throw Error('Invalid FH5 NVAPI provider alias.');
+    await plainDirectory(root, 'lib', 'apple_gptk', 'wine', 'x86_64-unix');
+    await plainDirectory(root, 'lib', 'apple_gptk', 'external');
+    return verified(path.join(root, 'lib/apple_gptk/external/libd3dshared.dylib'), expected, 256 * 1024 * 1024);
+  }
+  return verified(file, expected, 256 * 1024 * 1024);
 }
 async function command(deps: FH5PackDeps, executable: string, args: string[]): Promise<void> {
   const result = await deps.execute(executable, args);
@@ -67,7 +80,7 @@ async function prepareEngine(original: CrossOverInstall, root: string, manifest:
   const validate = async (target: string) => {
     await plainDirectory(target, 'Contents', 'SharedSupport', 'CrossOver', 'lib', 'wine', 'x86_64-unix');
     const engine = installation(original, target);
-    for (const name of engineNames.filter(name => !name.endsWith('/wine'))) await verified(path.join(engine.root, name), manifest.engineFiles[name], 256 * 1024 * 1024);
+    for (const name of engineNames.filter(name => !name.endsWith('/wine'))) await verifiedEngineFile(engine.root, name, manifest.engineFiles[name]);
     const receipt = JSON.parse(await fs.readFile(path.join(target, 'Contents/Resources/macxus-fh5-loader.json'), 'utf8')) as { loader?: string; manifest?: string };
     if (receipt.manifest !== digest(Buffer.from(JSON.stringify(manifest))) || receipt.loader !== manifest.preparedLoaderSHA256) throw Error('FH5 private-engine receipt mismatch.');
     await verified(path.join(engine.root, 'lib/wine/x86_64-unix/wine'), receipt.loader!);
@@ -122,7 +135,7 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
   if (!configuration.split(/\r?\n/).some(line => line.trim() === `"BuildTag" = "${manifest.buildTag}"`)) throw Error('Unsupported FH5 Preview build.');
   await verified(path.join(deps.assets, 'source.lock.json'), manifest.sourceLockSHA256);
   const entitlements = await verified(path.join(deps.assets, 'loader-entitlements.plist'), manifest.loaderEntitlementsSHA256);
-  for (const [name, hash] of Object.entries(manifest.engineFiles)) await verified(path.join(original.root, name), hash, 256 * 1024 * 1024);
+  for (const [name, hash] of Object.entries(manifest.engineFiles)) await verifiedEngineFile(original.root, name, hash);
   const payload = new Map<string, Buffer>();
   for (const [name, hash] of Object.entries(manifest.files)) {
     try { payload.set(name, await verified(path.join(deps.assets, 'payload', name), hash)); }
