@@ -145,3 +145,6 @@ uint64_t macxus_metal4_probe_counter(uint64_t key){
  NSUInteger index=slotFor(key,NO);NSData*data=[counters resolveCounterRange:NSMakeRange(index,1)];
  uint64_t value=0;if(data.length>=8)memcpy(&value,data.bytes,8);return value;
 }
+
+#include "../clock/clock-native.h"
+int32_t macxus_metal4_calibrate_v1(struct mx_clock_sample *p) { return mx_sample_device(gpu,p); }

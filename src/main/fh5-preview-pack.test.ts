@@ -14,7 +14,7 @@ async function fixture() {
   const source = Buffer.from('source lock fixture'), entitlements = Buffer.from('entitlements fixture');
   await fs.writeFile(path.join(assets, 'source.lock.json'), source); await fs.writeFile(path.join(assets, 'loader-entitlements.plist'), entitlements);
   const engineFiles = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
-  const files = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll'];
+  const files = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
   for (const name of engineFiles) { await fs.mkdir(path.dirname(path.join(engine, name)), { recursive: true }); await fs.writeFile(path.join(engine, name), 'vendor ' + name); }
   await fs.mkdir(path.join(engine, 'etc')); await fs.writeFile(path.join(engine, 'etc/CrossOver.conf'), '"BuildTag" = "cxpreview-20261015-rc1"\n');
   for (const name of files) await fs.writeFile(path.join(assets, 'payload', name), 'owned ' + name);
@@ -62,14 +62,32 @@ it('prepares a relocated private engine/bottle without modifying a hard-linked v
     expect(pack.runner.stopPrefix.command).toBe('/stop-only-this-prefix');
     const script = await fs.readFile(pack.runner.launchCommand!, 'utf8');
     expect(script).toContain('D3DM_MTL4='); expect(script).toContain('DYLD_INSERT_LIBRARIES='); expect(script).toContain('MACXUS_FH5_DESCRIPTOR_DATA=');
+    expect(script).toContain("MACXUS_GPU_CLOCK_CALIBRATION='1'"); expect(script).toContain('macxus-clock=b');
     expect(script).not.toContain('.asar/'); expect(script).not.toContain('/Applications/'); expect(script).not.toContain('XODUS_BRIDGE_KEY'); expect(script).not.toContain('XODUS_BRIDGE_PORT');
     execFileSync('/bin/sh', ['-n', pack.runner.launchCommand!]);
     expect(await fs.readFile(path.join(f.engine, 'lib/wine/x86_64-unix/wine'), 'utf8')).toBe('vendor lib/wine/x86_64-unix/wine');
     expect(await fs.readFile(path.join(pack.runner.compatibilityDataPath, 'drive_c/windows/system32/xgameruntime.dll'), 'utf8')).toBe('owned xgameruntime.dll');
+    expect(await fs.readFile(path.join(pack.runner.compatibilityDataPath, 'drive_c/windows/system32/macxus-clock.dll'), 'utf8')).toBe('owned macxus-clock.dll');
+    const managed = path.dirname(path.dirname(pack.runner.compatibilityDataPath));
+    expect(await fs.readFile(path.join(managed, 'native/clock-dlls/x86_64-windows/macxus-clock.dll'), 'utf8')).toBe('owned macxus-clock.dll');
+    expect(await fs.readFile(path.join(managed, 'native/clock-dlls/x86_64-unix/macxus-clock.so'), 'utf8')).toBe('owned macxus-clock.so');
     expect(await fs.stat(f.request.gameRoot).catch(() => undefined)).toBeUndefined();
     const before = f.execute.mock.calls.length;
     await prepareFH5PreviewPack(f.request, f.deps);
     expect(f.execute.mock.calls.slice(before).some(([tool]) => tool.endsWith('/ditto'))).toBe(false);
+  } finally { await fs.rm(f.root, { recursive: true, force: true }); }
+});
+it('refuses linked calibration module caches without writing outside the pack', async () => {
+  const f = await fixture();
+  try {
+    const pack = (await prepareFH5PreviewPack(f.request, f.deps))!;
+    const managed = path.dirname(path.dirname(pack.runner.compatibilityDataPath));
+    const module = path.join(managed, 'native/clock-dlls/x86_64-unix/macxus-clock.so');
+    const sentinel = path.join(f.root, 'outside'); await fs.writeFile(sentinel, 'preserve');
+    await fs.unlink(module); await fs.symlink(sentinel, module);
+    f.prepare.mockClear();
+    await expect(prepareFH5PreviewPack(f.request, f.deps)).rejects.toThrow('Invalid FH5 pack file');
+    expect(f.prepare).not.toHaveBeenCalled(); expect(await fs.readFile(sentinel, 'utf8')).toBe('preserve');
   } finally { await fs.rm(f.root, { recursive: true, force: true }); }
 });
 it.each(['foreign-engine', 'wrong-build', 'bad-payload', 'linked-payload', 'bad-signature', 'unsupported-host'])('fails closed before prefix setup for %s', async kind => {

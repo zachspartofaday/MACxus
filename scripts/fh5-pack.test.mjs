@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { createPackage } from '@electron/asar';
+import { finished } from 'node:stream/promises';
 import { stageFH5Bundle, stageFH5Source, verifyFH5Directory, verifyPackagedFH5 } from './fh5-pack.mjs';
 const hash = data => createHash('sha256').update(data).digest('hex');
 async function fixture() {
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'fh5 distribution paths '));const app=path.join(root,'app'),assets=path.join(app,'assets/fh5-preview'),bundle=path.join(root,'build');
  await fs.mkdir(path.join(bundle,'payload'),{recursive:true});await fs.mkdir(assets,{recursive:true});
- const files=Object.fromEntries(['d3d12.dll','macxus-metal4-timestamps.dylib','windows.web.dll','xgameruntime.dll'].map(name=>[name,hash('owned-'+name)]));
+ const files=Object.fromEntries(['d3d12.dll','macxus-metal4-timestamps.dylib','windows.web.dll','xgameruntime.dll','macxus-clock.dll','macxus-clock.so'].map(name=>[name,hash('owned-'+name)]));
  for(const name of Object.keys(files))await fs.writeFile(path.join(bundle,'payload',name),'owned-'+name);
  const sourceArchive={name:'fh5-preview-v1-source.tar.gz',sha256:hash('complete-source-fixture')};
  await fs.writeFile(path.join(bundle,sourceArchive.name),'complete-source-fixture');
@@ -28,8 +29,8 @@ test('publishes corresponding source next to release artifacts and excludes it f
  const f=await fixture();try{
   await stageFH5Bundle(f.bundle,f.assets);assert.equal((await verifyFH5Directory(f.assets)).enabled,true);
   const release=path.join(f.root,'release');const staged=await stageFH5Source(f.assets,release);assert.equal(staged.length,1);assert.equal(hash(await fs.readFile(staged[0].file)),f.manifest.sourceArchive.sha256);
-  const bad=path.join(f.root,'bad.asar');await createPackage(f.app,bad);await assert.rejects(verifyPackagedFH5(bad),/release asset/);
-  await fs.rm(path.join(f.assets,'source-release'),{recursive:true});const good=path.join(f.root,'good.asar');await createPackage(f.app,good);assert.equal((await verifyPackagedFH5(good)).enabled,true);
+  const bad=path.join(f.root,'bad.asar');await finished(await createPackage(f.app,bad));await assert.rejects(verifyPackagedFH5(bad),/release asset/);
+  await fs.rm(path.join(f.assets,'source-release'),{recursive:true});const good=path.join(f.root,'good.asar');await finished(await createPackage(f.app,good));assert.equal((await verifyPackagedFH5(good)).enabled,true);
  }finally{await fs.rm(f.root,{recursive:true,force:true});}
 });
 test('rejects linked staging directories and refuses a damaged installed payload cache',async()=>{

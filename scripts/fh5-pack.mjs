@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { extractFile, listPackage } from '@electron/asar';
-const names = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll'];
+const names = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
 async function plainDirectory(folder) {
   const stat = await fs.lstat(folder);
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('FH5 staging directories must not be links');

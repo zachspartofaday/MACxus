@@ -56,7 +56,7 @@ class Consumer(unittest.TestCase):
             scripts.mkdir(parents=True);assets.mkdir(parents=True);payload.mkdir(parents=True)
             shutil.copyfile(HERE/'verify.py',scripts/'verify.py')
             source=b'fixture source lock';(assets/'source.lock.json').write_bytes(source)
-            files={name:sha(name.encode()) for name in ['d3d12.dll','xgameruntime.dll','windows.web.dll','macxus-metal4-timestamps.dylib']}
+            files={name:sha(name.encode()) for name in ['d3d12.dll','xgameruntime.dll','windows.web.dll','macxus-metal4-timestamps.dylib','macxus-clock.dll','macxus-clock.so']}
             for name in files:(payload/name).write_text(name)
             receipt={'sourceLockSHA256':sha(source),'files':files,'sourceArchive':{'sha256':'archive hash must stay out'}}
             manifest={'schema':1,'id':'fh5-preview-v1','storeId':'9NNX1VVR3KNQ','version':'20261015','buildTag':'fixture','engineFiles':{'never-accessed':sha(b'engine')}}
