@@ -10,7 +10,12 @@ that native getter is missing. It forwards the native session, output buffer,
 status and profile handle, writes no settings, and leaves existing native
 functions in charge. Other exports/IDs pass through, and bindings from different
 provider modules are not mixed. The launcher fingerprints the provider PE and
-Unix components. No driver number, warning result, game instruction or vendor
+Unix components. The shim also checks the loaded module's backing-file SHA256,
+executable bytes and query entry point before returning an adapter. The launcher
+materializes the verified PE from the selected engine in the private bottle;
+Wine's tiny placeholder is insufficient for this check. A same-name, same-size
+foreign provider and a foreign loaded module with a replaced backing file are
+rejected in real runtime controls. No driver number, warning result, game instruction or vendor
 binary is supplied by this change.
 
 The full-patch-chain prototype then reached the native driver-version API and

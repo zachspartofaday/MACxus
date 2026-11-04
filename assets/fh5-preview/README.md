@@ -52,6 +52,23 @@ uninstall script or modification of the original game/application.
   trial reached the benchmark without the startup dialog and displayed `576.2`
   with DLAA/frame generation retained; the integrated pack still needs normal
   Play validation for this addition. No version number or dialog is overridden.
+- Both NVAPI adapters require the pinned provider PE, matching loaded executable
+  bytes and its expected query entry point. The launcher copies the verified PE
+  from the user's selected engine into the dedicated bottle; no vendor binary
+  is redistributed. The accepted module is pinned while adapters can refer to it.
+- Missing legacy `NvAPI_GPU_GetMemoryInfo` delegates to native `GetMemoryInfoEx`.
+  Exact V1/V2/V3 layouts are supported. Byte counts become KiB with floor division
+  and saturation; eviction counts remain counts. Native legacy support wins,
+  and unsupported versions or native failures leave output data unchanged.
+- A private `CX_HOME` snapshots only complete compatibility-database/signature
+  pairs from the user's CrossOver support directory. Preview still verifies the
+  vendor signatures with its own key. Missing caches are logged; no rules are
+  invented, and no account or license files are copied. Restoring database access
+  does not establish that this cache contains a matching FH5 rule.
+- `MACXUS_FH5_HEAP_TRACE=1` is a bounded, read-only diagnostic for heap import and
+  nearby successful allocations. It is off in normal Play. The native synthetic
+  control returns `E_NOTIMPL` for address import and succeeds with an ordinary
+  heap; whether FH5's particular call takes a harmless fallback remains pending.
 - Explicit input-layout offsets; the tested
   absent-render-target blend adjustment; guest committed-memory accounting and
   dual-stack UDP TTL handling. Normal diagnostic observers remain off.

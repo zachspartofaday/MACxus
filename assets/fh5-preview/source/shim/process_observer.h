@@ -298,7 +298,7 @@ static void process_observer_install(void)
             if(!ordinal){SIZE_T rva=(SIZE_T)thunk->u1.AddressOfData;if(!observer_image_range(image,rva,3) || !observer_image_string(base,image,rva+2))continue;name=(const char*)base+rva+2;}
             for(unsigned i=0;i<sizeof(observer_hooks)/sizeof(observer_hooks[0]);i++){
                 struct observer_hook *h=observer_hooks+i;
-                if(h->api==33 ? !fh5_nvapi_enabled : h->api==31 ? !fh5_data_enabled : h->api>=26 && !observer_async_io_enabled)continue;
+                if(h->api==33 ? !(fh5_nvapi_enabled || fh5_nvapi_memory_enabled) : h->api==31 ? !fh5_data_enabled : h->api>=26 && !observer_async_io_enabled)continue;
                 if(h->socket!=net || (ordinal ? !h->ordinal || h->ordinal!=ordinal : strcmp(h->name,name)))continue;
                 installed+=observer_patch_slot((void**)(base+target),h);break;
             }

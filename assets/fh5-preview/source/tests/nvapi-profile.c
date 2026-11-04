@@ -57,6 +57,10 @@ static DWORD WINAPI fixture_module_name(HMODULE module, LPWSTR output, DWORD cap
     return length;
 }
 #define GetModuleFileNameW fixture_module_name
+/* Provider fingerprinting has a separate real-file/loaded-DLL probe. */
+#define MACXUS_FH5_NVAPI_PROVIDER_H
+static BOOL fh5_nvapi_check_provider(HMODULE module) { return module != (HMODULE)7; }
+static BOOL fh5_nvapi_check_entry(HMODULE module, FARPROC entry) { (void)module; (void)entry; return TRUE; }
 #include "../shim/nvapi_profile.h"
 #undef GetModuleFileNameW
 
@@ -96,6 +100,8 @@ int main(void)
         CHECK(fh5_nvapi_getproc((HMODULE)(uintptr_t)i, "nvapi_QueryInterface") == (void *)query_a);
         CHECK(GetLastError() == 777 && !fh5_nvapi_module);
     }
+    CHECK(fh5_nvapi_getproc((HMODULE)7, "nvapi_QueryInterface") == (void *)query_a);
+    CHECK(GetLastError() == 777 && !fh5_nvapi_module);
     CHECK(!fh5_nvapi_getproc(NULL, "nvapi_QueryInterface") && GetLastError() == 777);
     CHECK(fh5_nvapi_getproc((HMODULE)1, MAKEINTRESOURCEA(1)) == (void *)native_global && GetLastError() == 777);
     CHECK(fh5_nvapi_getproc((HMODULE)1, "OtherExport") == (void *)native_global && GetLastError() == 777);
