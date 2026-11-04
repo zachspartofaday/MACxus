@@ -67,6 +67,7 @@ static int shim_debug_level(void)
 }
 static int timestamp_only;
 static int gpu_failure_on;
+#include "heap_import_trace.h"
 static LONG gpu_call_counts[32];
 static void gpu_failure_note(unsigned op,HRESULT hr)
 {
@@ -309,6 +310,7 @@ static HRESULT STDMETHODCALLTYPE hook_CreateCommittedResource(ID3D12Device *dev,
 {
     if (dbg) { log_resource("CreateCommittedResource begin", d, 0); }
     HRESULT hr = real_CreateCommittedResource(dev, hp, hf, d, st, cv, riid, out);
+    if (fh5_heap_trace && SUCCEEDED(hr)) fh5_heap_note(2, hr, d ? d->Width : 0, d ? d->Alignment : 0, hf, out != NULL, OBS_CALLER);
     gpu_failure_note(10, hr);
     if (dbg) { log_resource("CreateCommittedResource done", d, hr); if (d && d->Dimension != D3D12_RESOURCE_DIMENSION_BUFFER) LOG("  -> res=%p", out ? *out : NULL); }
     return hr;
@@ -1034,7 +1036,7 @@ static void patch_device2_vtbl(void *iface)
 // Failure-only observer: arguments, HRESULTs and output ownership are forwarded unchanged.
 static HRESULT (STDMETHODCALLTYPE *gpu_real_CreateHeap)(ID3D12Device *,const D3D12_HEAP_DESC *d,REFIID iid,void **out);
 static HRESULT STDMETHODCALLTYPE gpu_hook_CreateHeap(ID3D12Device *device,const D3D12_HEAP_DESC *d,REFIID iid,void **out)
-{ HRESULT hr=gpu_real_CreateHeap(device,d,iid,out);gpu_failure_note(13,hr);return hr; }
+{ HRESULT hr=gpu_real_CreateHeap(device,d,iid,out);if(fh5_heap_trace && SUCCEEDED(hr))fh5_heap_note(1,hr,d?d->SizeInBytes:0,d?d->Alignment:0,d?d->Flags:0,out!=NULL,OBS_CALLER);gpu_failure_note(13,hr);return hr; }
 static HRESULT (STDMETHODCALLTYPE *gpu_real_CreateDescriptorHeap)(ID3D12Device *,const D3D12_DESCRIPTOR_HEAP_DESC *d,REFIID iid,void **out);
 static HRESULT STDMETHODCALLTYPE gpu_hook_CreateDescriptorHeap(ID3D12Device *device,const D3D12_DESCRIPTOR_HEAP_DESC *d,REFIID iid,void **out)
 { HRESULT hr=gpu_real_CreateDescriptorHeap(device,d,iid,out);gpu_failure_note(14,hr);return hr; }
@@ -1052,16 +1054,16 @@ static HRESULT STDMETHODCALLTYPE gpu_hook_CreateCommandQueue(ID3D12Device *devic
 { HRESULT hr=gpu_real_CreateCommandQueue(device,d,iid,out);gpu_failure_note(18,hr);return hr; }
 static HRESULT (STDMETHODCALLTYPE *gpu_real_CreateCommittedResource1)(ID3D12Device4 *,const D3D12_HEAP_PROPERTIES *hp,D3D12_HEAP_FLAGS hf,const D3D12_RESOURCE_DESC *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out);
 static HRESULT STDMETHODCALLTYPE gpu_hook_CreateCommittedResource1(ID3D12Device4 *device,const D3D12_HEAP_PROPERTIES *hp,D3D12_HEAP_FLAGS hf,const D3D12_RESOURCE_DESC *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out)
-{ HRESULT hr=gpu_real_CreateCommittedResource1(device,hp,hf,d,st,cv,ps,iid,out);gpu_failure_note(20,hr);return hr; }
+{ HRESULT hr=gpu_real_CreateCommittedResource1(device,hp,hf,d,st,cv,ps,iid,out);if(fh5_heap_trace && SUCCEEDED(hr))fh5_heap_note(4,hr,d?d->Width:0,d?d->Alignment:0,hf,out!=NULL,OBS_CALLER);gpu_failure_note(20,hr);return hr; }
 static HRESULT (STDMETHODCALLTYPE *gpu_real_CreateHeap1)(ID3D12Device4 *,const D3D12_HEAP_DESC *d,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out);
 static HRESULT STDMETHODCALLTYPE gpu_hook_CreateHeap1(ID3D12Device4 *device,const D3D12_HEAP_DESC *d,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out)
-{ HRESULT hr=gpu_real_CreateHeap1(device,d,ps,iid,out);gpu_failure_note(21,hr);return hr; }
+{ HRESULT hr=gpu_real_CreateHeap1(device,d,ps,iid,out);if(fh5_heap_trace && SUCCEEDED(hr))fh5_heap_note(3,hr,d?d->SizeInBytes:0,d?d->Alignment:0,d?d->Flags:0,out!=NULL,OBS_CALLER);gpu_failure_note(21,hr);return hr; }
 static HRESULT (STDMETHODCALLTYPE *gpu_real_CreateReservedResource1)(ID3D12Device4 *,const D3D12_RESOURCE_DESC *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out);
 static HRESULT STDMETHODCALLTYPE gpu_hook_CreateReservedResource1(ID3D12Device4 *device,const D3D12_RESOURCE_DESC *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out)
 { HRESULT hr=gpu_real_CreateReservedResource1(device,d,st,cv,ps,iid,out);gpu_failure_note(22,hr);return hr; }
 static HRESULT (STDMETHODCALLTYPE *gpu_real_CreateCommittedResource2)(ID3D12Device8 *,const D3D12_HEAP_PROPERTIES *hp,D3D12_HEAP_FLAGS hf,const D3D12_RESOURCE_DESC1 *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out);
 static HRESULT STDMETHODCALLTYPE gpu_hook_CreateCommittedResource2(ID3D12Device8 *device,const D3D12_HEAP_PROPERTIES *hp,D3D12_HEAP_FLAGS hf,const D3D12_RESOURCE_DESC1 *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,ID3D12ProtectedResourceSession *ps,REFIID iid,void **out)
-{ HRESULT hr=gpu_real_CreateCommittedResource2(device,hp,hf,d,st,cv,ps,iid,out);gpu_failure_note(23,hr);return hr; }
+{ HRESULT hr=gpu_real_CreateCommittedResource2(device,hp,hf,d,st,cv,ps,iid,out);if(fh5_heap_trace && SUCCEEDED(hr))fh5_heap_note(5,hr,d?d->Width:0,d?d->Alignment:0,hf,out!=NULL,OBS_CALLER);gpu_failure_note(23,hr);return hr; }
 static HRESULT (STDMETHODCALLTYPE *gpu_real_CreatePlacedResource1)(ID3D12Device8 *,ID3D12Heap *heap,UINT64 offset,const D3D12_RESOURCE_DESC1 *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,REFIID iid,void **out);
 static HRESULT STDMETHODCALLTYPE gpu_hook_CreatePlacedResource1(ID3D12Device8 *device,ID3D12Heap *heap,UINT64 offset,const D3D12_RESOURCE_DESC1 *d,D3D12_RESOURCE_STATES st,const D3D12_CLEAR_VALUE *cv,REFIID iid,void **out)
 { HRESULT hr=gpu_real_CreatePlacedResource1(device,heap,offset,d,st,cv,iid,out);gpu_failure_note(24,hr);return hr; }
@@ -1096,7 +1098,7 @@ static void patch_device_vtbl(void *iface)
     patch_slot((void **)&vt->CreateQueryHeap, (void *)hook_CreateQueryHeap, (void **)&real_CreateQueryHeap);
     if (timestamp_only) {
         if (append_only) patch_slot((void **)&vt->CreateGraphicsPipelineState, (void *)hook_CreateGraphicsPipelineState, (void **)&real_CreateGraphicsPipelineState);
-        if (gpu_failure_on) gpu_patch_0(iface);
+        if (gpu_failure_on || fh5_heap_trace) gpu_patch_0(iface);
         return;
     }
     patch_slot((void **)&vt->CheckFeatureSupport, (void *)hook_CheckFeatureSupport, (void **)&real_CheckFeatureSupport);
@@ -1177,8 +1179,12 @@ static void patch_device(ID3D12Device *dev)
         void *p = NULL;
         if (FAILED(dev->lpVtbl->QueryInterface(dev, dev_ids[i], &p)) || !p) continue;
         if (!timestamp_only || append_only) patch_device1_vtbl(p);
-        if (gpu_failure_on && i>=3) gpu_patch_4(p);
-        if (gpu_failure_on && i>=7) gpu_patch_8(p);
+        if (fh5_heap_trace && i>=2) {
+            ID3D12Device3Vtbl *vt = *(ID3D12Device3Vtbl **)p;
+            patch_slot((void **)&vt->OpenExistingHeapFromAddress, (void *)fh5_OpenExistingHeapFromAddress, (void **)&fh5_real_OpenExistingHeapFromAddress);
+        }
+        if ((gpu_failure_on || fh5_heap_trace) && i>=3) gpu_patch_4(p);
+        if ((gpu_failure_on || fh5_heap_trace) && i>=7) gpu_patch_8(p);
         if ((!timestamp_only || append_only) && i >= 1) patch_device2_vtbl(p);   // dev_ids[0] is ID3D12Device1, the rest are ID3D12Device2 and later
         ((IUnknown *)p)->lpVtbl->Release((IUnknown *)p);
     }
@@ -1273,6 +1279,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
         { char v[8]; fh5_unused_blend = append_only && GetEnvironmentVariableA("MACXUS_FH5_UNUSED_BLEND", v, sizeof v) == 1 && v[0] == '1'; }
         { char v[8]; fh5_blend_trace = GetEnvironmentVariableA("MACXUS_FH5_BLEND_TRACE", v, sizeof v) == 1 && v[0] == '1'; }
         { char v[8]; gpu_failure_on=GetEnvironmentVariableA("MACXUS_GPU_FAILURE_OBSERVER",v,sizeof v)==1 && v[0]=='1'; }
+        { char v[8]; fh5_heap_trace=GetEnvironmentVariableA("MACXUS_FH5_HEAP_TRACE",v,sizeof v)==1 && v[0]=='1'; }
         { char v[8]; fh5_blend_usage=append_only&&gpu_failure_on&&GetEnvironmentVariableA("MACXUS_FH5_BLEND_USAGE",v,sizeof v)==1&&v[0]=='1'; }
         { char v[8]; fh5_render_audit=fh5_blend_usage&&GetEnvironmentVariableA("MACXUS_FH5_RENDER_AUDIT",v,sizeof v)==1&&v[0]=='1'; }
         // HB_TSSHIM_DEBUG=1: pipelines and feature queries; 2: also every resource and view (hundreds of MB, slow)

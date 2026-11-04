@@ -43,8 +43,22 @@ def main():
         system=prefix/'drive_c/windows/system32'
         for name in ['xgameruntime.dll','windows.web.dll','macxus-clock.dll']:
             temporary=system/(name+'.pack');shutil.copyfile(build/'payload'/name,temporary);temporary.replace(system/name)
-        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','store-addons']:
+        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','nvapi-profile','nvapi-memory','heap-import','store-addons']:
             run(name,[wine,build/'probes'/(name+'.exe')])
+        provider=engine/'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll'
+        temporary=system/'nvapi64.dll.pack';shutil.copyfile(provider,temporary);temporary.replace(system/'nvapi64.dll')
+        nvapi_env={'MACXUS_PROCESS_OBSERVER':'1','MACXUS_FH5_NVAPI_PROFILE':'1','MACXUS_FH5_NVAPI_MEMORY':'1',
+                   'MACXUS_TIMESTAMP_ONLY':'1','MACXUS_APPEND_ONLY':'1','HB_TSSHIM_DEBUG':'0',
+                   'HB_D3D12_REAL':'Z:'+str(engine/'lib/apple_gptk/wine/x86_64-windows/d3d12.dll').replace('/','\\'),
+                   'WINEDLLPATH':':'.join(str(engine/name) for name in ['lib/apple_gptk/wine/x86_64-windows','lib/apple_gptk/wine','lib/wine/x86_64-windows','lib/wine']),
+                   'WINEDLLOVERRIDES':env['WINEDLLOVERRIDES']+';d3d12=n,b;nvapi64=n,b'}
+        run('nvapi-provider-accepted',[wine,build/'probes/nvapi-provider.exe',build/'payload/d3d12.dll','nvapi64.dll','accepted'],nvapi_env)
+        run('nvapi-provider-foreign',[wine,build/'probes/nvapi-provider.exe',build/'payload/d3d12.dll',build/'probes/foreign/nvapi64.dll','rejected'],nvapi_env)
+        swap=root/'replaced-provider';swap.mkdir();shutil.copyfile(build/'probes/foreign/nvapi64.dll',swap/'nvapi64.dll')
+        run('nvapi-provider-replaced-file',[wine,build/'probes/nvapi-provider.exe',build/'payload/d3d12.dll',swap/'nvapi64.dll','rejected',provider],nvapi_env)
+        heap_log=root/'heap-metadata.log';heap_log.touch()
+        run('heap-import-native',[wine,build/'probes/heap-import.exe','--native',build/'payload/d3d12.dll'],
+            {**nvapi_env,'D3DM_MTL4':'1','MACXUS_FH5_HEAP_TRACE':'1','MACXUS_PROCESS_OBSERVER_LOG':'Z:'+str(heap_log).replace('/','\\')})
         # The unmodified vendor loader correctly refuses native injection. This
         # control accepts failure semantics only; enabled PE/native calibration
         # is separately tested through the prepared game wrapper.

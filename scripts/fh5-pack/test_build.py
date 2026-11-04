@@ -1,9 +1,18 @@
 """Offline build-input contracts; no compiler, Wine, network, account or game."""
-import importlib.util, tempfile, unittest
+import importlib.util, tempfile, unittest, json, re
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('fh5_build',Path(__file__).with_name('build.py'))
 build=importlib.util.module_from_spec(spec);spec.loader.exec_module(build)
 class Inputs(unittest.TestCase):
+    def test_nvapi_provider_identity_matches_the_selected_engine_pin(self):
+        pack=build.PACK
+        descriptor=pack/('manifest.json' if (pack/'manifest.json').exists() else 'verification.json')
+        manifest=json.loads(descriptor.read_text())
+        header=(pack/'source/shim/nvapi_provider.h').read_text()
+        values=re.search(r'fh5_nvapi_provider_digest\[32\] = \{(.*?)\}',header,re.S).group(1)
+        digest=bytes(int(v,16) for v in re.findall(r'0x([0-9a-f]{2})',values)).hex()
+        self.assertEqual(digest,manifest['engineFiles']['lib/apple_gptk/wine/x86_64-windows/nvapi64.dll'])
+        self.assertIn('#define FH5_NVAPI_PROVIDER_SIZE 200256u',header)
     def test_relative_and_absolute_sdk_includes_map_to_the_same_fresh_source(self):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);sdk=root/'sdk';old=root/'wine-src/dlls/xgameruntime';new=root/'fresh/runtime';out=root/'output'

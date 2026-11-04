@@ -1,17 +1,18 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { release } from 'node:os';
+import { release, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { shellQuote, type CrossOverInstall, type RuntimeDllSource } from './crossover.js';
 import { run, type RunResult } from './process.js';
 import { validateCompatibilityPrefix } from './compatibility-prefix.js';
 import type { ProtonRunner } from './proton.js';
+import { prepareFH5CompatHome } from './fh5-compat-home.js';
 
 export const FH5_STORE_ID = '9NNX1VVR3KNQ';
 const assetRoot = fileURLToPath(new URL('../../assets/fh5-preview', import.meta.url));
 const payloadNames = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
-const engineNames = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
+const engineNames = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll', 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
 const digest = (data: Buffer) => createHash('sha256').update(data).digest('hex');
 interface Manifest {
   schema: 1; id: 'fh5-preview-v1'; storeId: string; version: string; buildTag: string;
@@ -21,6 +22,7 @@ export interface FH5PackDeps {
   assets: string;
   execute: (tool: string, args: string[]) => Promise<RunResult>;
   host?: () => Promise<{ platform: string; darwinMajor: number; chip: string }>;
+  compatibilityHome?: string;
   prepare: (engine: CrossOverInstall, bottles: string, runtime: RuntimeDllSource, log: (line: string) => void, architecture?: 'win64' | 'arm64') => Promise<ProtonRunner>;
 }
 interface Request {
@@ -160,20 +162,40 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
   // Validate any existing setup paths before the vendor runner can update them.
   const prefix = path.join(bottles, 'xbox');
   await validateCompatibilityPrefix(prefix, bottles);
+  const nvapiTarget = path.join(prefix, 'drive_c/windows/system32/nvapi64.dll');
+  const validateNvapiTarget = async () => {
+    for (const file of [nvapiTarget, nvapiTarget + '.fh5-' + process.pid]) {
+      try {
+        const stat = await fs.lstat(file);
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw Error('FH5 NVAPI setup files must not be links.');
+      } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    }
+  };
+  await validateNvapiTarget();
   const runner = await deps.prepare(engine, bottles, request.runtime, request.log, 'win64');
   if (path.resolve(runner.compatibilityDataPath) !== prefix) throw Error('FH5 requires its dedicated bottle.');
   await validateCompatibilityPrefix(prefix, bottles);
+  await validateNvapiTarget();
   await plainDirectory(prefix, 'drive_c', 'windows', 'system32');
-  for (const name of ['d3d12.dll', 'xgameruntime.dll', 'windows.web.dll', 'macxus-clock.dll']) {
+  // Wine normally installs a tiny builtin placeholder. Materialize the verified
+  // vendor PE so the shim can identify the loaded provider by its actual bytes.
+  // These bytes come from the selected engine; they are not shipped in our pack.
+  payload.set('nvapi64.dll', await verified(path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll'),
+    manifest.engineFiles['lib/apple_gptk/wine/x86_64-windows/nvapi64.dll']));
+  for (const name of ['d3d12.dll', 'xgameruntime.dll', 'windows.web.dll', 'macxus-clock.dll', 'nvapi64.dll']) {
     const target = path.join(prefix, 'drive_c/windows/system32', name), temporary = target + '.fh5-' + process.pid;
     await fs.writeFile(temporary, payload.get(name)!, { flag: 'wx', mode: 0o644 });
     try { await fs.rename(temporary, target); } finally { await fs.unlink(temporary).catch(() => undefined); }
   }
   const logs = await directory(root, 'logs');
   const log = await fs.mkdtemp(path.join(logs, 'session-'));
+  // Preview's CXUtils removes " Preview" from the product's cellar ID.
+  // Its normal Perl launcher sets CX_HOME; our direct native loader must too.
+  const compatibility = await prepareFH5CompatHome(deps.compatibilityHome ?? path.join(homedir(), 'Library/Application Support/CrossOver'), await directory(root, 'compat-homes'));
+  request.log(compatibility.pairs ? `FH5 copied ${compatibility.pairs} signed compatibility database pairs; Preview will verify their signatures.` : 'FH5 found no signed compatibility database cache; vendor title rules may be unavailable.');
   const native = path.join(engine.root, 'lib/wine/x86_64-unix/wine');
   const environment = {
-    CX_BOTTLE_PATH: bottles, CX_BOTTLE: 'xbox', WINEPREFIX: prefix, CX_ROOT: engine.root,
+    CX_BOTTLE_PATH: bottles, CX_BOTTLE: 'xbox', WINEPREFIX: prefix, CX_ROOT: engine.root, CX_HOME: compatibility.home,
     WINELOADER: native, WINESERVER: engine.wineserver, CX_GRAPHICS_BACKEND: 'd3dmetal', CX_ACTIVE_GRAPHICS_BACKEND: 'd3dmetal',
     CX_D3DMETALPATH: path.join(engine.root, 'lib/apple_gptk/external'),
     WINEDLLPATH: [clockDlls, path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows'), path.join(engine.root, 'lib/apple_gptk/wine'), path.join(engine.root, 'lib/wine/x86_64-windows'), path.join(engine.root, 'lib/wine')].join(':'),
@@ -183,7 +205,7 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
     MACXUS_GPU_QUERY_COOKIE: randomBytes(8).toString('hex'),
     D3DM_MTL4: '1', MACXUS_PROCESS_OBSERVER: '1', MACXUS_TIMESTAMP_ONLY: '1', MACXUS_APPEND_ONLY: '1', MACXUS_FH5_UNUSED_BLEND: '1',
     MACXUS_GPU_CLOCK_CALIBRATION: '1',
-    MACXUS_FH5_DESCRIPTOR_DATA: '1', MACXUS_DUAL_UDP_TTL: '1', MACXUS_COMMIT_ACCOUNTING: '1', HB_TSSHIM_DEBUG: '0',
+    MACXUS_FH5_DESCRIPTOR_DATA: '1', MACXUS_DUAL_UDP_TTL: '1', MACXUS_COMMIT_ACCOUNTING: '1', MACXUS_FH5_NVAPI_PROFILE: '1', MACXUS_FH5_NVAPI_MEMORY: '1', HB_TSSHIM_DEBUG: '0',
     D3DM_DEVICE_DESCRIPTION: `${host.chip} (D3DMetal)`,
     HB_D3D12_REAL: 'Z:' + path.join(engine.root, 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll').replaceAll('/', '\\'),
     XODUS_CONTENT_PACKAGE_ROOT: 'Z:' + path.resolve(request.gameRoot).replaceAll('/', '\\'),

@@ -13,7 +13,7 @@ async function fixture() {
   await fs.mkdir(path.join(assets, 'payload'), { recursive: true });
   const source = Buffer.from('source lock fixture'), entitlements = Buffer.from('entitlements fixture');
   await fs.writeFile(path.join(assets, 'source.lock.json'), source); await fs.writeFile(path.join(assets, 'loader-entitlements.plist'), entitlements);
-  const engineFiles = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
+  const engineFiles = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll', 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
   const files = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
   for (const name of engineFiles) { await fs.mkdir(path.dirname(path.join(engine, name)), { recursive: true }); await fs.writeFile(path.join(engine, name), 'vendor ' + name); }
   await fs.mkdir(path.join(engine, 'etc')); await fs.writeFile(path.join(engine, 'etc/CrossOver.conf'), '"BuildTag" = "cxpreview-20261015-rc1"\n');
@@ -43,7 +43,7 @@ async function fixture() {
     const prefix = path.join(bottles, 'xbox'); await fs.mkdir(path.join(prefix, 'drive_c/windows/system32'), { recursive: true });
     return { command: path.join(bottles, 'normal-runner'), compatibilityDataPath: prefix, stopPrefix: { command: '/stop-only-this-prefix', args: [] } };
   });
-  const deps: FH5PackDeps = { assets, execute, prepare, host: async () => ({ platform: 'darwin', darwinMajor: 25, chip: 'Apple M5 Max' }) };
+  const deps: FH5PackDeps = { assets, execute, prepare, compatibilityHome: path.join(root, 'absent vendor home'), host: async () => ({ platform: 'darwin', darwinMajor: 25, chip: 'Apple M5 Max' }) };
   return { root, app, engine, assets, manifest, request, deps, execute, prepare };
 }
 it('is inactive by default and rejects unrelated games without mutating their setup', async () => {
@@ -63,6 +63,9 @@ it('prepares a relocated private engine/bottle without modifying a hard-linked v
     const script = await fs.readFile(pack.runner.launchCommand!, 'utf8');
     expect(script).toContain('D3DM_MTL4='); expect(script).toContain('DYLD_INSERT_LIBRARIES='); expect(script).toContain('MACXUS_FH5_DESCRIPTOR_DATA=');
     expect(script).toContain("MACXUS_GPU_CLOCK_CALIBRATION='1'"); expect(script).toContain('macxus-clock=b');
+    expect(script).toContain("MACXUS_FH5_NVAPI_PROFILE='1'");
+    expect(script).toContain("MACXUS_FH5_NVAPI_MEMORY='1'");
+    expect(script).toContain('CX_HOME=');
     expect(script).toContain("D3DM_DEVICE_DESCRIPTION='Apple M5 Max (D3DMetal)'");
     expect(script).toContain('unset D3DM_VENDOR_ID D3DM_DEVICE_ID');
     expect(script).not.toContain('NVIDIA GeForce RTX 4070');
@@ -71,6 +74,7 @@ it('prepares a relocated private engine/bottle without modifying a hard-linked v
     expect(await fs.readFile(path.join(f.engine, 'lib/wine/x86_64-unix/wine'), 'utf8')).toBe('vendor lib/wine/x86_64-unix/wine');
     expect(await fs.readFile(path.join(pack.runner.compatibilityDataPath, 'drive_c/windows/system32/xgameruntime.dll'), 'utf8')).toBe('owned xgameruntime.dll');
     expect(await fs.readFile(path.join(pack.runner.compatibilityDataPath, 'drive_c/windows/system32/macxus-clock.dll'), 'utf8')).toBe('owned macxus-clock.dll');
+    expect(await fs.readFile(path.join(pack.runner.compatibilityDataPath, 'drive_c/windows/system32/nvapi64.dll'), 'utf8')).toBe('vendor lib/apple_gptk/wine/x86_64-windows/nvapi64.dll');
     const managed = path.dirname(path.dirname(pack.runner.compatibilityDataPath));
     expect(await fs.readFile(path.join(managed, 'native/clock-dlls/x86_64-windows/macxus-clock.dll'), 'utf8')).toBe('owned macxus-clock.dll');
     expect(await fs.readFile(path.join(managed, 'native/clock-dlls/x86_64-unix/macxus-clock.so'), 'utf8')).toBe('owned macxus-clock.so');
@@ -158,5 +162,18 @@ it('rejects linked registry files before vendor prefix updates', async () => {
     f.prepare.mockClear();
     await expect(prepareFH5PreviewPack(f.request, f.deps)).rejects.toThrow(/must not be (links|symlinks)/);
     expect(f.prepare).not.toHaveBeenCalled(); expect(await fs.readFile(outside, 'utf8')).toBe('unrelated');
+  } finally { await fs.rm(f.root, { recursive: true, force: true }); }
+});
+
+it.each(['nvapi64.dll', `nvapi64.dll.fh5-${process.pid}`])('rejects linked NVAPI setup destination %s before vendor preparation', async name => {
+  const f = await fixture();
+  try {
+    const pack = (await prepareFH5PreviewPack(f.request, f.deps))!;
+    const outside = path.join(f.root, 'outside-nvapi'); await fs.writeFile(outside, 'preserve');
+    const destination = path.join(pack.runner.compatibilityDataPath, 'drive_c/windows/system32', name);
+    await fs.unlink(destination).catch(() => undefined); await fs.symlink(outside, destination);
+    f.prepare.mockClear();
+    await expect(prepareFH5PreviewPack(f.request, f.deps)).rejects.toThrow('NVAPI setup files');
+    expect(f.prepare).not.toHaveBeenCalled(); expect(await fs.readFile(outside, 'utf8')).toBe('preserve');
   } finally { await fs.rm(f.root, { recursive: true, force: true }); }
 });
