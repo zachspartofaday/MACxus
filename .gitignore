@@ -37,3 +37,6 @@ docs/internal/
 /assets/fh5-preview/source-release/
 
 /scripts/fh5-pack/__pycache__/
+# This pack consists of our own small, committed source recipe.
+!/assets/compatibility-packs/bond-public-config-v1/source/
+/assets/compatibility-packs/bond-public-config-v1/payload/

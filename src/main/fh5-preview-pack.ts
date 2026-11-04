@@ -5,7 +5,7 @@ import { release } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { shellQuote, type CrossOverInstall, type RuntimeDllSource } from './crossover.js';
 import { run, type RunResult } from './process.js';
-import { validateCompatibilityPrefix } from './game-compatibility-pack.js';
+import { validateCompatibilityPrefix } from './compatibility-prefix.js';
 import type { ProtonRunner } from './proton.js';
 
 export const FH5_STORE_ID = '9NNX1VVR3KNQ';
@@ -148,10 +148,10 @@ export async function prepareFH5PreviewPack(request: Request, deps: FH5PackDeps)
   const bottles = await directory(root, 'bottles');
   // Validate any existing setup paths before the vendor runner can update them.
   const prefix = path.join(bottles, 'xbox');
-  await validateCompatibilityPrefix(prefix, bottles, { configuration: [] });
+  await validateCompatibilityPrefix(prefix, bottles);
   const runner = await deps.prepare(engine, bottles, request.runtime, request.log, 'win64');
   if (path.resolve(runner.compatibilityDataPath) !== prefix) throw Error('FH5 requires its dedicated bottle.');
-  await validateCompatibilityPrefix(prefix, bottles, { configuration: [] });
+  await validateCompatibilityPrefix(prefix, bottles);
   await plainDirectory(prefix, 'drive_c', 'windows', 'system32');
   for (const name of ['d3d12.dll', 'xgameruntime.dll', 'windows.web.dll']) {
     const target = path.join(prefix, 'drive_c/windows/system32', name), temporary = target + '.fh5-' + process.pid;
