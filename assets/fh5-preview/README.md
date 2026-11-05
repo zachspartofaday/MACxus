@@ -52,6 +52,16 @@ uninstall script or modification of the original game/application.
 
 ## Components and bounds
 
+The `MACXUS_FH5_ACTIVE_BLEND=1` experiment is off by default. It replaces SRC1
+blend factors with corresponding SRC factors only when readable pixel-output
+metadata rules out the genuine two-colour-output dual-source case. It operates
+on copied pipeline descriptions, retaining shader bytes, unreadable signatures,
+disabled/absent targets and genuine dual-source state. This is a compatibility
+rendering policy, not proof of Windows equivalence or an accepted black-road fix.
+Use `MACXUS_FH5_ACTIVE_BLEND=0` to disable it. See
+`experiments/fh5-active-blend` in the repository for owned-shader comparisons and
+the pending game comparison. Other pack features remain unchanged in this trial.
+
 - Shared authentication, readiness and product-query compatibility, plus the
   add-on license adapter and bounded installation-root mapping. The source pack
   retains its own validated runtime base; updating the shared runtime alone

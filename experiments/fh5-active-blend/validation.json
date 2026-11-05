@@ -1,0 +1,41 @@
+{
+  "baseline": "161228122723cf4f53965920f1f89240b9a916c9",
+  "scope": "Default-off active-target blend policy; no other rendering feature changes",
+  "sourceInspiration": "https://github.com/xvferxedd/fh5-d3dmetal-fix/tree/83944060dee664bee18b44d35a1fca63b86edc0e",
+  "contracts": {
+    "checks": 2862,
+    "passed": true
+  },
+  "renderCombinations": 32,
+  "renderExpectationMismatches": 0,
+  "nativeModulesChanged": [
+    "d3d12.dll"
+  ],
+  "otherFiveNativeModulesUnchanged": true,
+  "gameLaunchedForAcceptance": false,
+  "gameAcceptance": "pending",
+  "windowsParityClaimed": false,
+  "files": {
+    "macxus-metal4-timestamps.dylib": "f77cb14a1c0c5f4ced62a4c6ef70550358ad0a5e7617047a01060891cc081e1e",
+    "windows.web.dll": "d96352f9c95bde5c1b1c790b5eda80ea06b0772b9d44508ed8b6fb1aaa6e68d6",
+    "macxus-clock.dll": "1de8135b98f479edd050de1d0f496a771c42fc4143d0c4f3679ce83e7d3b6026",
+    "d3d12.dll": "34af1a1e1df51971f47bd6f8ec5885a5d3355603189a065e19ec89cb5e794d44",
+    "macxus-clock.so": "690c1bdef5133b445ddf9818b38aa4cd6ff381cabbb153d2e580db52bf372ab4",
+    "xgameruntime.dll": "7f3b8bc86edbaa3d85c6579160c32c14afa8d3961a164787e1434474d7411636"
+  },
+  "sourceArchive": {
+    "name": "fh5-preview-v1-source.tar.gz",
+    "sha256": "a6dafac4963fe1f4ddee46e285c53f6854dba91415da45397418e10d87b7044e"
+  },
+  "finalCandidateRenderCombinations": 32,
+  "fullPackSyntheticProbes": 23,
+  "fullPackSyntheticFailures": 0,
+  "launcherChecks": {
+    "passed": 1494,
+    "skipped": 10,
+    "typecheck": "passed"
+  },
+  "pythonContracts": 7,
+  "distributionTests": 3,
+  "renderProbeD3d12SHA256": "34af1a1e1df51971f47bd6f8ec5885a5d3355603189a065e19ec89cb5e794d44"
+}

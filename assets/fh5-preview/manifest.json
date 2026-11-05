@@ -4,7 +4,7 @@
   "storeId": "9NNX1VVR3KNQ",
   "version": "20261015",
   "buildTag": "cxpreview-20261015-rc1",
-  "sourceLockSHA256": "fdf7a6fd5db623e9d02b41b1d16759d645d7dba6b7b0c992a4ed83c223007c57",
+  "sourceLockSHA256": "b95736f6871e7e02d14c8f3027f65a594b42c6fd3b1ac466813ad6a48ca6d9cf",
   "loaderEntitlementsSHA256": "744210d0e90c98700d63d865654ae3ac5a4e9325969bf8d43adb6b5250d57f46",
   "preparedLoaderSHA256": "0179c0067abe71215c882593dc50528ce3b508de200c208b5957cdf3f715a91a",
   "engineFiles": {
@@ -22,12 +22,13 @@
     "macxus-metal4-timestamps.dylib": "f77cb14a1c0c5f4ced62a4c6ef70550358ad0a5e7617047a01060891cc081e1e",
     "windows.web.dll": "d96352f9c95bde5c1b1c790b5eda80ea06b0772b9d44508ed8b6fb1aaa6e68d6",
     "macxus-clock.dll": "1de8135b98f479edd050de1d0f496a771c42fc4143d0c4f3679ce83e7d3b6026",
-    "d3d12.dll": "077ab7292a121385f43655fb599b5097fd1dfce3fcedfc803e459652a16eb1e3",
+    "d3d12.dll": "34af1a1e1df51971f47bd6f8ec5885a5d3355603189a065e19ec89cb5e794d44",
     "macxus-clock.so": "690c1bdef5133b445ddf9818b38aa4cd6ff381cabbb153d2e580db52bf372ab4",
     "xgameruntime.dll": "7f3b8bc86edbaa3d85c6579160c32c14afa8d3961a164787e1434474d7411636"
   },
-  "gameValidation": "Original portable pack reached normal Play and multiplayer; separate calibration/identity trials passed; latest integrated installed build has user-confirmed launch only",
+  "gameValidation": "Accepted baseline features retained; default-off active-target blend experiment has synthetic pixel acceptance only; FH5 comparison pending",
   "knownLimitations": [
+    "MACXUS_FH5_ACTIVE_BLEND is off by default; active-target SRC1-to-SRC policy is experimental, not Windows parity or accepted black-road repair",
     "Only M5 Max game-tested; other M3 or newer Macs are experimental and untested, with a visible opt-in warning",
     "35 ms latency display reported in a separate normal-Play calibration trial; input-to-display accuracy, actual sleep/resume and long-session drift remain unvalidated",
     "Black road surfaces remain; marketplace purchase details report an error and purchasing is not accepted",
@@ -37,6 +38,6 @@
   ],
   "sourceArchive": {
     "name": "fh5-preview-v1-source.tar.gz",
-    "sha256": "a330c4be6e016d96924eea93e7a9b02a10b663e05f5825f18c40da6b7f92d598"
+    "sha256": "a6dafac4963fe1f4ddee46e285c53f6854dba91415da45397418e10d87b7044e"
   }
 }

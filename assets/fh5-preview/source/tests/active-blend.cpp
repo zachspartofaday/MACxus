@@ -37,7 +37,12 @@ int main(int argc,char **argv) {
     const unsigned char *center=&result.pixels[(H/2*W+W/2)*4];
     bool blended=center[0]>=63&&center[0]<=65&&center[1]==0&&center[2]>=127&&center[2]<=129&&center[3]==255;
     bool skipped=center[0]==0&&center[1]==0&&center[2]==255&&center[3]==255;
-    std::printf("ACTIVE_BLEND outputs=%u api=%s center=%u,%u,%u,%u blended=%d skipped=%d depth=%d\n",outputs,stream_mode?"stream":"direct",center[0],center[1],center[2],center[3],blended,skipped,depth);
+    // Explicit single-source reference is a controlled rendering policy, not a
+    // claim that it reproduces undefined SRC1 values on real Windows drivers.
+    active_blend_reference=true;Render reference;
+    bool reference_ok=draw("explicit_single_source",source.c_str(),{elem("POSITION",0,DXGI_FORMAT_R32G32_FLOAT,0,0)},vertices,sizeof(vertices),8,nullptr,0,reference);
+    bool matches_reference=reference_ok&&result.pixels==reference.pixels;
+    std::printf("ACTIVE_BLEND outputs=%u api=%s center=%u,%u,%u,%u genuine_blended=%d skipped=%d depth=%d matches_single_source=%d\n",outputs,stream_mode?"stream":"direct",center[0],center[1],center[2],center[3],blended,skipped,depth,matches_reference);
     root->Release();fence->Release();queue->Release();dev->Release();
-    return blended?0:skipped?10:11;
+    return outputs==2?(blended&&!matches_reference?0:11):matches_reference?0:skipped?10:11;
 }

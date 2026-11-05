@@ -44,6 +44,9 @@ static HRESULT pipeline(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& p,ID3D12Pipeli
  D3D12_PIPELINE_STATE_STREAM_DESC desc={bytes.size(),bytes.data()};hr=d2->CreatePipelineState(&desc,IID_ID3D12PipelineState,(void**)out);d2->Release();return hr;
 }
 struct Render {UINT64 hash;unsigned colored;double cx,cy;std::vector<unsigned char> pixels;};
+#ifdef MACXUS_ACTIVE_BLEND_PROBE
+static bool active_blend_reference;
+#endif
 static bool draw(const char *name,const char *source,std::vector<D3D12_INPUT_ELEMENT_DESC> elements,const void *vertices,UINT vertex_bytes,UINT stride,const void *instances,UINT instance_bytes,Render &result){
  ID3DBlob *vs=nullptr,*ps=nullptr;if(!shader(source,"vs","vs_5_0",&vs)||!shader(source,"ps","ps_5_0",&ps))return false;
 #ifdef MACXUS_CACHE_ORDER_PROBE
@@ -67,7 +70,7 @@ static bool draw(const char *name,const char *source,std::vector<D3D12_INPUT_ELE
 #define MACXUS_ACTIVE_BLEND_ENABLE TRUE
 #endif
  p.BlendState.RenderTarget[0].BlendEnable=MACXUS_ACTIVE_BLEND_ENABLE;
- p.BlendState.RenderTarget[0].DestBlend=D3D12_BLEND_SRC1_COLOR;
+ p.BlendState.RenderTarget[0].DestBlend=active_blend_reference?D3D12_BLEND_SRC_COLOR:D3D12_BLEND_SRC1_COLOR;
 #endif
 #ifdef MACXUS_PIPELINE_DESC_PROBE
  pipeline_desc_probe(p);
