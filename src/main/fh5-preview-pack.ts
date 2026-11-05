@@ -9,7 +9,8 @@ import { validateCompatibilityPrefix } from './compatibility-prefix.js';
 import type { ProtonRunner } from './proton.js';
 import { prepareFH5CompatHome } from './fh5-compat-home.js';
 
-export const FH5_STORE_ID = '9NNX1VVR3KNQ';
+import { FH5_STORE_ID } from '../shared/launch-tools.js';
+export { FH5_STORE_ID } from '../shared/launch-tools.js';
 const assetRoot = fileURLToPath(new URL('../../assets/fh5-preview', import.meta.url));
 const payloadNames = ['d3d12.dll', 'macxus-metal4-timestamps.dylib', 'windows.web.dll', 'xgameruntime.dll', 'macxus-clock.dll', 'macxus-clock.so'];
 const engineNames = ['lib/apple_gptk/external/D3DMetal.framework/Versions/A/D3DMetal', 'lib/apple_gptk/external/D3DMetal.framework/Versions/A/Resources/libmetalirconverter.dylib', 'lib/apple_gptk/external/libd3dshared.dylib', 'lib/apple_gptk/wine/x86_64-windows/d3d12core.dll', 'lib/apple_gptk/wine/x86_64-windows/d3d12.dll', 'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll', 'lib/apple_gptk/wine/x86_64-unix/nvapi64.so', 'lib/wine/x86_64-unix/ntdll.so', 'lib/wine/x86_64-unix/wine'];
