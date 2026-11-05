@@ -43,7 +43,7 @@ def main():
         system=prefix/'drive_c/windows/system32'
         for name in ['xgameruntime.dll','windows.web.dll','macxus-clock.dll']:
             temporary=system/(name+'.pack');shutil.copyfile(build/'payload'/name,temporary);temporary.replace(system/name)
-        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','nvapi-profile','nvapi-memory','heap-import','store-addons']:
+        for name in ['data-fixture','input-layout-contracts','unused-blend-contracts','active-blend-contracts','gpu-clock-reporting','io-lifetime','stream-debug-contracts','nvapi-profile','nvapi-memory','heap-import','store-addons']:
             run(name,[wine,build/'probes'/(name+'.exe')])
         provider=engine/'lib/apple_gptk/wine/x86_64-windows/nvapi64.dll'
         temporary=system/'nvapi64.dll.pack';shutil.copyfile(provider,temporary);temporary.replace(system/'nvapi64.dll')

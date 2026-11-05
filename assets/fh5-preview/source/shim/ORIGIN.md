@@ -1,5 +1,12 @@
 # D3DMetal timestamp/compat shim (tsshim)
 
+The opt-in `active_blend.h` experiment was inspired by the broader SRC1-to-SRC
+blend policy in xvferxedd/fh5-d3dmetal-fix, GPL-3.0, commit
+`83944060dee664bee18b44d35a1fca63b86edc0e`:
+https://github.com/xvferxedd/fh5-d3dmetal-fix/blob/83944060dee664bee18b44d35a1fca63b86edc0e/src/d3d12.c
+It uses this pack's read-only shader-signature parser and narrower conservative
+guards. It is not a Windows blending-equivalence claim or an accepted FH5 fix.
+
 `d3d12.c` and `d3d12.def` are copied verbatim from Highball, by Gauthier Piarrette:
 https://github.com/gauthierpiarrette/highball/tree/main/spike/tsshim
 

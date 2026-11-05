@@ -554,6 +554,8 @@ static BOOL fix_unused_blend(D3D12_BLEND_DESC *b, UINT targets, DXGI_FORMAT targ
     return TRUE;
 }
 
+#include "active_blend.h"
+
 // ---- shader dump (HB_TSSHIM_DUMP) ----------------------------------------------------------------
 
 static int dump_shaders;
@@ -715,6 +717,7 @@ static const D3D12_GRAPHICS_PIPELINE_STATE_DESC *fix_graphics_desc(const D3D12_G
         layout = resolve_append_offsets(&d->InputLayout, fx->elems);
         blend = d->BlendState;
         fx->blend = fh5_unused_blend && fix_unused_blend(&blend, d->NumRenderTargets, d->RTVFormats[0]);
+        fx->blend |= fix_active_blend(&blend,d->NumRenderTargets,d->RTVFormats,d->PS,0);
         trace_unused_blend(0,&d->BlendState,d->NumRenderTargets,d->RTVFormats[0],fx->blend);
         if (!layout && !fx->blend) return d;
         *copy = *d;
@@ -780,7 +783,7 @@ static UINT64 bytecode_hash(D3D12_SHADER_BYTECODE b);
 static BOOL rewrite_stream(const D3D12_PIPELINE_STATE_STREAM_DESC *in, D3D12_PIPELINE_STATE_STREAM_DESC *out, Fixups *fx)
 {
     const UINT8 *s; SIZE_T o = 0, layout_at = 0, vs_at = 0, ps_at = 0, blend_at = 0, formats_at = 0, depth_at = 0, raster_at = 0;
-    UINT raster_type = 0; int bias = 0;
+    UINT raster_type = 0; int bias = 0; UINT64 seen=0; BOOL duplicate=FALSE;
     D3D12_INPUT_LAYOUT_DESC layout; D3D12_SHADER_BYTECODE vs = { 0 }, ps = { 0 }; BOOL new_layout = FALSE, new_ps = FALSE, new_vs = FALSE, replaced_ps = FALSE; UINT8 *buf;
     D3D12_BLEND_DESC blend; struct D3D12_RT_FORMAT_ARRAY formats = { { 0 }, 0 };   // no RENDER_TARGET_FORMATS subobject: no render targets
     fx->ps = fx->stream = NULL; fx->blend = FALSE; memset(fx->hash, 0, sizeof fx->hash); fx->targets = fx->format0 = 0;
@@ -791,6 +794,8 @@ static BOOL rewrite_stream(const D3D12_PIPELINE_STATE_STREAM_DESC *in, D3D12_PIP
         UINT type; SIZE_T align, size, at;
         memcpy(&type, s + o, sizeof type);
         if (!(size = stream_inner_size(type, &align))) return FALSE;
+        if(seen&((UINT64)1<<type))duplicate=TRUE;
+        seen|=(UINT64)1<<type;
         at = (o + sizeof(UINT) + align - 1) & ~(align - 1);
         if (at + size > in->SizeInBytes) return FALSE;
         if (type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT) layout_at = at;
@@ -809,16 +814,19 @@ static BOOL rewrite_stream(const D3D12_PIPELINE_STATE_STREAM_DESC *in, D3D12_PIP
         }
         o = (at + size + sizeof(void *) - 1) & ~(sizeof(void *) - 1);
     }
+    if(fh5_active_blend && (duplicate || o!=in->SizeInBytes))return FALSE;
     if (append_only) {
         if (layout_at) {
             memcpy(&layout, s + layout_at, sizeof layout);
             new_layout = resolve_append_offsets(&layout, fx->elems);
         }
-        if ((fh5_unused_blend || fh5_blend_trace) && blend_at) {
+        if ((fh5_unused_blend || fh5_blend_trace || fh5_active_blend) && blend_at) {
             memcpy(&blend, s + blend_at, sizeof blend);
             if (formats_at) memcpy(&formats, s + formats_at, sizeof formats);
             D3D12_BLEND_DESC original_blend=blend;
             fx->blend = fh5_unused_blend && fix_unused_blend(&blend, formats.NumRenderTargets, formats.RTFormats[0]);
+            if(ps_at)memcpy(&ps,s+ps_at,sizeof ps);
+            fx->blend |= fix_active_blend(&blend,formats.NumRenderTargets,formats.RTFormats,ps,1);
             trace_unused_blend(1,&original_blend,formats.NumRenderTargets,formats.RTFormats[0],fx->blend);
         }
         if (!new_layout && !fx->blend) return FALSE;
@@ -1277,6 +1285,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
         { char v[8]; timestamp_only = GetEnvironmentVariableA("MACXUS_TIMESTAMP_ONLY", v, sizeof v) == 1 && v[0] == '1'; }
         { char v[8]; append_only = timestamp_only && GetEnvironmentVariableA("MACXUS_APPEND_ONLY", v, sizeof v) == 1 && v[0] == '1'; }
         { char v[8]; fh5_unused_blend = append_only && GetEnvironmentVariableA("MACXUS_FH5_UNUSED_BLEND", v, sizeof v) == 1 && v[0] == '1'; }
+        { char v[8]; fh5_active_blend = append_only && GetEnvironmentVariableA("MACXUS_FH5_ACTIVE_BLEND", v, sizeof v) == 1 && v[0] == '1'; }
         { char v[8]; fh5_blend_trace = GetEnvironmentVariableA("MACXUS_FH5_BLEND_TRACE", v, sizeof v) == 1 && v[0] == '1'; }
         { char v[8]; gpu_failure_on=GetEnvironmentVariableA("MACXUS_GPU_FAILURE_OBSERVER",v,sizeof v)==1 && v[0]=='1'; }
         { char v[8]; fh5_heap_trace=GetEnvironmentVariableA("MACXUS_FH5_HEAP_TRACE",v,sizeof v)==1 && v[0]=='1'; }
@@ -1304,6 +1313,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
         RESOLVE(D3D12SerializeVersionedRootSignature); RESOLVE(GetBehaviorValue);
         LOG("loaded in front of the real d3d12.dll; timestamp_only=%d append_only=%d", timestamp_only, append_only);
         process_observer_install();
+        if(fh5_active_blend)observer_note(33,0,"active_blend_config enabled=1 experimental=1 shader_writes=0");
         observer_note(25,0,"blend_config append_only=%d enabled=%d trace=%d kill_switch=%d",append_only,fh5_unused_blend,fh5_blend_trace,keep_unused_blend);
         if(fh5_blend_usage)observer_note(25,0,"usage_config enabled=1 recorded_calls_only=1 pipeline_capacity=%u list_capacity=%u",USAGE_PIPE_CAP,USAGE_LIST_CAP);
         if(fh5_render_audit)render_audit_note("op=config metadata_only=1 shader_names_retained=0 checkpoint=1 banner=2 cloth=4 road=8 decal=16 flag=32 skid=64");
