@@ -1,7 +1,7 @@
 """Prepare only the pinned Wine PE build SDK; never install Wine or start a game."""
 import argparse, json, os, re, shutil
 from pathlib import Path
-from build import REPO, PACK, execute, sha, check, sdk_digest
+from build import REPO, PACK, execute, sha, check, sdk_digest, runtime_lock_file
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -16,8 +16,7 @@ def main():
     if root == REPO or REPO.is_relative_to(root): raise ValueError('SDK output must not contain the recipe')
     root.mkdir(parents=True, exist_ok=False)
     pack_lock = json.loads((PACK / 'source.lock.json').read_text())
-    lock_file = REPO / 'scripts/runtime-patches.lock.json'
-    if sha(lock_file) != pack_lock['runtimeSourceLockSHA256']: raise ValueError('Runtime lock mismatch')
+    lock_file = runtime_lock_file(pack_lock)
     lock = json.loads(lock_file.read_text())
     env = {k: v for k, v in os.environ.items() if not k.startswith(('WINE', 'CX_', 'DYLD_', 'MACXUS_', 'XODUS_', 'XUSER_', 'NEXUS_'))}
     env.update(SOURCE_DATE_EPOCH=str(pack_lock['sourceDateEpoch']), LC_ALL='C')

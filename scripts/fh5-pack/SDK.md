@@ -17,7 +17,8 @@ export PATH="$(brew --prefix bison)/bin:$(brew --prefix flex)/bin:$PATH"
 
 The SDK bootstrap fetches the three exact Git object IDs (Wine, xgameruntime and
 nghttp2 declarations) from the public repositories
-in `scripts/runtime-patches.lock.json`. It applies only the locked Wine/runtime
+in `scripts/fh5-pack/runtime-patches.lock.json` (the FH5-specific pinned base,
+independent of updates to the launcher's shared runtime lock). It applies only the locked Wine/runtime
 patches and builds the native compiler helpers, generated headers and PE import
 libraries. Optional local mirrors supply those Git objects without using their
 working trees. Both output directories below must be new:

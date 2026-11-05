@@ -15,10 +15,11 @@ class Consumer(unittest.TestCase):
             scripts.mkdir(parents=True);shutil.copyfile(HERE/'build.py',scripts/'build.py')
             for name in ['scripts/runtime-tests','scripts/runtime-compat','assets/fh5-preview/source/shim','assets/fh5-preview/source/metal4']:(recipe/name).mkdir(parents=True)
             (recipe/'scripts/fh5-pack.mjs').write_text('// fixture')
-            (recipe/'scripts/runtime-patches.lock.json').write_text('{"patches":[]}')
+            (scripts/'runtime-patches.lock.json').write_text('{"patches":[]}')
+            (recipe/'scripts/runtime-patches.lock.json').write_text('unrelated shared lock')
             for name in ['COPYING.GPL-3.0','COPYING.LGPL-2.1']:(assets/name).write_text('fixture license')
             versions={'mingwGCC':'16.2.0','appleClang':'fixture clang','macOSSDK':'27.0'}
-            lock={'sources':{},'sourceDateEpoch':0,'toolchain':versions,'runtimeSourceLockSHA256':sha(b'fixture'),'wineCommit':'f'*40}
+            lock={'sources':{},'sourceDateEpoch':0,'toolchain':versions,'runtimeSourceLockSHA256':sha((scripts/'runtime-patches.lock.json').read_bytes()),'wineCommit':'f'*40}
             (assets/'source.lock.json').write_text(json.dumps(lock))
             descriptor={'schema':1,'id':'fh5-preview-v1','storeId':'9NNX1VVR3KNQ','version':'20261015','buildTag':'fixture','engineFiles':{},'sourceReleaseDescriptor':1}
             (assets/'verification.json').write_text(json.dumps(descriptor))

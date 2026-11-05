@@ -150,3 +150,64 @@ it('waits for termination of a relocated backend that ignores SIGTERM before rel
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+}
+it('aborts and drains sibling metadata workers before releasing the request gate', async () => {
+  const ids = Array.from({ length: 50 }, (_, i) => `B${String(i).padStart(11, '0')}`);
+  const siblingStarted = deferred(), cancelling = deferred(), release = deferred();
+  let settled = false, fail = true, siblingAborted = false;
+  const deps: AddonDiscoveryDeps = {
+    library: async () => ({ schema: 1, skippedEntitlements: 0, entitlements: (fail ? ids : []).map(productId => ({ productId })) }),
+    metadata: async (url, signal) => {
+      if (url.searchParams.get('bigIds')!.startsWith(ids[0])) {
+        await siblingStarted.promise; throw Error('synthetic catalog failure');
+      }
+      siblingStarted.resolve();
+      return new Promise((_, reject) => signal.addEventListener('abort', () => {
+        siblingAborted = true; cancelling.resolve();
+        void release.promise.then(() => reject(Error('synthetic reader cleanup complete')));
+      }, { once: true }));
+    },
+  };
+  const handler = createStoreAddonDiscovery('/synthetic/backend', parent, deps);
+  const running = handler(request, new AbortController().signal).then(value => { settled = true; return value; });
+  try {
+    await cancelling.promise;
+    await new Promise<void>(done => setImmediate(done));
+    expect(siblingAborted).toBe(true); expect(settled).toBe(false);
+    expect((await handler(request, new AbortController().signal)).toString()).toContain('2147942570');
+    release.resolve(); expect((await running).toString()).toContain('2147500037');
+    fail = false;
+    expect((await handler(request, new AbortController().signal)).toString()).toContain('<HResult>0</HResult>');
+  } finally { release.resolve(); await running; }
+});
+it('awaits rejected HTTP body cancellation before advancing bounded metadata workers', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'addon HTTP cleanup '));
+  const binary = path.join(root, 'backend'), release = deferred();
+  const ids = Array.from({ length: 26 }, (_, i) => `B${String(i).padStart(11, '0')}`);
+  const inventory = { schema: 1, skippedEntitlements: 0, entitlements: ids.map(productId => ({ productId })) };
+  await fs.writeFile(binary, `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(JSON.stringify(inventory))});\n`, { mode: 0o700 });
+  let live = 0, maximum = 0, started = 0, cancelled = 0, requests = 0;
+  vi.stubGlobal('fetch', vi.fn(async (input: URL) => {
+    if (input.hostname === 'displaycatalog.mp.microsoft.com') return new Response(JSON.stringify({ Products: [] }));
+    requests++; live++; maximum = Math.max(maximum, live);
+    return new Response(new ReadableStream({ cancel: async () => {
+      const ordinal = ++started;
+      if (ordinal <= 4) await release.promise;
+      cancelled++; live--;
+    } }), { status: 503 });
+  }));
+  const running = createStoreAddonDiscovery(binary, parent)(request, new AbortController().signal);
+  try {
+    await vi.waitFor(() => expect(started).toBe(4), { timeout: 1000 });
+    expect(requests).toBe(4); expect(live).toBe(4);
+    release.resolve();
+    expect((await running).toString()).toContain('<HResult>0</HResult>');
+    expect(requests).toBe(26); expect(cancelled).toBe(26); expect(live).toBe(0); expect(maximum).toBeLessThanOrEqual(4);
+  } finally { release.resolve(); await running; vi.unstubAllGlobals(); await fs.rm(root, { recursive: true, force: true }); }
+});

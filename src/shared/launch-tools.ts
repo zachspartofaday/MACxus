@@ -1,5 +1,8 @@
 import type { GameLaunchTools } from './types.js';
 
+export const FH5_STORE_ID = '9NNX1VVR3KNQ';
+export const supportsFH5PreviewPack = (storeId?: string): boolean => storeId?.toUpperCase() === FH5_STORE_ID;
+
 export const defaultLaunchTools: GameLaunchTools = { fh5PreviewCompatibility: false, dualSenseCompatibility: false, offlineWithoutAntiCheat: false, metalHud: false, dlss: false, mangoHud: false, gamescope: false, gamescopeArgs: '', launchOptions: '' };
 
 /** Command words only, never a shell program. Quotes group literal arguments. */

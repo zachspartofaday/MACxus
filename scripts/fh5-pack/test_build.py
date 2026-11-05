@@ -1,9 +1,20 @@
 """Offline build-input contracts; no compiler, Wine, network, account or game."""
 import importlib.util, tempfile, unittest, json, re
+from unittest.mock import patch
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('fh5_build',Path(__file__).with_name('build.py'))
 build=importlib.util.module_from_spec(spec);spec.loader.exec_module(build)
 class Inputs(unittest.TestCase):
+    def test_dedicated_runtime_lock_matches_pack_even_when_shared_lock_differs(self):
+        lock=json.loads((build.PACK/'source.lock.json').read_text())
+        dedicated=build.runtime_lock_file(lock)
+        self.assertEqual(dedicated,Path(build.__file__).with_name('runtime-patches.lock.json'))
+        for entry in json.loads(dedicated.read_text())['patches']:
+            self.assertEqual(build.sha(build.REPO/entry['file']),entry['sha256'])
+        with tempfile.TemporaryDirectory() as folder, patch.object(build,'REPO',Path(folder)):
+            shared=build.REPO/'scripts/runtime-patches.lock.json';shared.parent.mkdir();shared.write_text('different shared runtime')
+            self.assertEqual(build.runtime_lock_file(lock),dedicated)
+
     def test_nvapi_provider_identity_matches_the_selected_engine_pin(self):
         pack=build.PACK
         descriptor=pack/('manifest.json' if (pack/'manifest.json').exists() else 'verification.json')

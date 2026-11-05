@@ -91,7 +91,10 @@ function productionDeps(backendBinary: string): AddonDiscoveryDeps {
       if (url.protocol !== 'https:' || url.port || url.username || url.password || url.hash ||
           !['displaycatalog.mp.microsoft.com', 'storeedgefd.dsx.mp.microsoft.com'].includes(url.hostname)) throw Error('Invalid metadata endpoint.');
       const result = await fetch(url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) });
-      if (!result.ok || !result.body) throw Error('Metadata unavailable.');
+      if (!result.ok || !result.body) {
+        await result.body?.cancel().catch(() => undefined);
+        throw Error('Metadata unavailable.');
+      }
       const reader = result.body.getReader();
       const buffers: Buffer[] = [];
       let size = 0;
@@ -108,17 +111,28 @@ function productionDeps(backendBinary: string): AddonDiscoveryDeps {
     },
   };
 }
-async function boundedMap<T, R>(values: T[], action: (value: T) => Promise<R>, signal: AbortSignal): Promise<R[]> {
+async function boundedMap<T, R>(values: T[], action: (value: T, signal: AbortSignal) => Promise<R>, signal: AbortSignal): Promise<R[]> {
   const result = new Array<R>(values.length);
+  const failed = new AbortController();
+  const active = AbortSignal.any([signal, failed.signal]);
   let cursor = 0;
-  await Promise.all(Array.from({ length: Math.min(4, values.length) }, async () => {
-    for (;;) {
-      signal.throwIfAborted();
-      const index = cursor++;
-      if (index >= values.length) return;
-      result[index] = await action(values[index]);
+  const workers = Array.from({ length: Math.min(4, values.length) }, async () => {
+    try {
+      for (;;) {
+        active.throwIfAborted();
+        const index = cursor++;
+        if (index >= values.length) return;
+        result[index] = await action(values[index], active);
+      }
+    } catch (error) {
+      failed.abort();
+      throw error;
     }
-  }));
+  });
+  // The request gate and bridge own all work until response readers finish
+  // cancelling, including siblings aborted by another worker's failure.
+  const settled = await Promise.allSettled(workers);
+  for (const worker of settled) if (worker.status === 'rejected') throw worker.reason;
   return result;
 }
 export function parseAddonDiscoveryRequest(bytes: Buffer, expectedParent: string): { parent: string; market: string } {
@@ -147,10 +161,10 @@ async function discover(parent: string, market: string, deps: AddonDiscoveryDeps
   const batches: string[][] = [];
   for (let i = 0; i < ids.length; i += 25) batches.push(ids.slice(i, i + 25));
   const catalog = new Map<string, Record<string, unknown>>();
-  await boundedMap(batches, async batch => {
+  await boundedMap(batches, async (batch, workerSignal) => {
     const url = new URL('https://displaycatalog.mp.microsoft.com/v7.0/products');
     url.search = new URLSearchParams({ bigIds: batch.join(','), market, languages: 'en-US,neutral' }).toString();
-    const products = array(object(await deps.metadata(url, signal)).Products, batch.length);
+    const products = array(object(await deps.metadata(url, workerSignal)).Products, batch.length);
     const seen = new Set<string>();
     for (const value of products) {
       const row = object(value), identifier = row.ProductId;
@@ -162,16 +176,16 @@ async function discover(parent: string, market: string, deps: AddonDiscoveryDeps
   // as evidence that a product cannot carry an add-on license.
   const possible = ids.filter(identifier => !['Game', 'Consumable', 'UnmanagedConsumable', 'Pass'].includes(String(catalog.get(identifier)?.ProductType)));
   if (possible.length > 512) throw Error('Inventory discovery bound exceeded.');
-  const candidates = await boundedMap(possible, async identifier => {
+  const candidates = await boundedMap(possible, async (identifier, workerSignal) => {
     const row = catalog.get(identifier);
     let parentId: unknown;
     try {
       const url = new URL(`https://storeedgefd.dsx.mp.microsoft.com/v9.0/products/${identifier}`);
       url.search = new URLSearchParams({ market, locale: 'en-us', deviceFamily: 'Windows.Desktop', actionFilter: 'Details', cardsEnabled: 'true' }).toString();
-      const result = object(await deps.metadata(url, signal));
+      const result = object(await deps.metadata(url, workerSignal));
       const detail = object(result.Payload ?? result);
       if (detail.ProductId === identifier) parentId = detail.ParentId;
-    } catch { signal.throwIfAborted(); }
+    } catch { workerSignal.throwIfAborted(); }
     if (row?.ProductType === 'Durable' && typeof parentId === 'string' && id.test(parentId) && parentId !== parent) return undefined;
     const associated = row?.ProductType === 'Durable' && parentId === parent;
     const skus: Candidate['skus'] = [];

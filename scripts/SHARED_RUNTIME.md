@@ -551,7 +551,10 @@ returning licenses. Missing classification is retained for signed negative proof
 missing/incomplete inventory is an error. The 255-candidate bound reserves one
 of the runtime's 256 proof IDs for the base title. Requests are title-bound,
 cancellable, bounded to 80 seconds and one active discovery per session. Bridge
-shutdown aborts pending account/HTTP work. Raw account responses and subprocess
+shutdown aborts pending account/HTTP work and awaits every metadata worker,
+including response-reader cancellation. Failed HTTP responses are cancelled
+before a worker advances, keeping live response bodies within the concurrency
+bound. Raw account responses and subprocess
 errors are not emitted to launcher logs or the game.
 
 This foundation does not enable itself for existing launches. The FH5 runtime

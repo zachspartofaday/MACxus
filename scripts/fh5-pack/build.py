@@ -14,9 +14,13 @@ def execute(args, cwd, capture=False, env=None):
                           stdout=subprocess.PIPE if capture else None,
                           stderr=subprocess.PIPE if capture else None).stdout
 
+def runtime_lock_file(lock):
+    file=Path(__file__).with_name('runtime-patches.lock.json')
+    if sha(file) != lock['runtimeSourceLockSHA256']: raise ValueError('FH5 runtime lock changed')
+    return file
+
 def reconstruct(mirror, output, lock):
-    runtime=json.loads((REPO/'scripts/runtime-patches.lock.json').read_text())
-    if sha(REPO/'scripts/runtime-patches.lock.json') != lock['runtimeSourceLockSHA256']: raise ValueError('Runtime lock changed')
+    runtime=json.loads(runtime_lock_file(lock).read_text())
     archive=execute(['git','-C',mirror,'archive','--format=tar','--prefix=dlls/xgameruntime/',runtime['sources']['xgameruntime']['commit']],REPO,True)
     output.mkdir()
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar: tar.extractall(output,filter='data')
@@ -232,8 +236,7 @@ def main():
     for folder in ['scripts/fh5-pack','scripts/runtime-tests','scripts/runtime-compat']:
         shutil.copytree(REPO/folder,recipe/folder,ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copyfile(REPO/'scripts/fh5-pack.mjs',recipe/'scripts/fh5-pack.mjs')
-    shutil.copyfile(REPO/'scripts/runtime-patches.lock.json',recipe/'scripts/runtime-patches.lock.json')
-    for patch in json.loads((REPO/'scripts/runtime-patches.lock.json').read_text())['patches']:
+    for patch in json.loads(runtime_lock_file(lock).read_text())['patches']:
         target=recipe/patch['file'];target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(REPO/patch['file'],target)
     shutil.copytree(PACK,recipe/'assets/fh5-preview',ignore=shutil.ignore_patterns('payload','source-release','manifest.json'))
     # Verification needs the candidate/engine pins, but including the final
